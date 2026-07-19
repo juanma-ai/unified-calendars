@@ -1,0 +1,85 @@
+import Store from 'electron-store'
+
+const PREFERENCES_KEY = 'calendarPreferences'
+const DEFAULT_PREFERENCES = {
+  calendarColors: {},
+  calendarVisibility: {},
+  hiddenCalendars: [],
+  hiddenEvents: []
+}
+
+function normalize(value = {}) {
+  return {
+    calendarColors: value.calendarColors ?? {},
+    calendarVisibility: value.calendarVisibility ?? {},
+    hiddenCalendars: value.hiddenCalendars ?? [],
+    hiddenEvents: value.hiddenEvents ?? []
+  }
+}
+
+export function createCalendarPreferencesStore(storage) {
+  const get = () => normalize(storage.get(PREFERENCES_KEY, DEFAULT_PREFERENCES))
+  const save = (preferences) => storage.set(PREFERENCES_KEY, normalize(preferences))
+
+  return {
+    get,
+
+    setCalendarColor(calendarId, color) {
+      const preferences = get()
+      preferences.calendarColors[calendarId] = color
+      save(preferences)
+      return get()
+    },
+
+    setCalendarVisibility(calendarId, visible) {
+      const preferences = get()
+      preferences.calendarVisibility[calendarId] = visible
+      preferences.hiddenCalendars = preferences.hiddenCalendars.filter((id) => id !== calendarId)
+      save(preferences)
+      return get()
+    },
+
+    hideEvent(event) {
+      const targetId = event.scope === 'series' ? event.seriesId : event.eventId
+      if (!targetId) throw new Error(`Cannot hide ${event.scope} without an identifier`)
+
+      const preferences = get()
+      const hiddenEvent = {
+        ...event,
+        key: `${event.scope}:${targetId}`
+      }
+      preferences.hiddenEvents = [
+        ...preferences.hiddenEvents.filter((item) => item.key !== hiddenEvent.key),
+        hiddenEvent
+      ]
+      save(preferences)
+      return get()
+    },
+
+    restoreHiddenEvent(key) {
+      const preferences = get()
+      preferences.hiddenEvents = preferences.hiddenEvents.filter((item) => item.key !== key)
+      save(preferences)
+      return get()
+    }
+  }
+}
+
+let defaultPreferencesStore
+
+function getDefaultStore() {
+  if (!defaultPreferencesStore) {
+    defaultPreferencesStore = createCalendarPreferencesStore(
+      new Store({ name: 'calendar-personal-app' })
+    )
+  }
+  return defaultPreferencesStore
+}
+
+export const getCalendarPreferences = () => getDefaultStore().get()
+export const setCalendarColor = (calendarId, color) =>
+  getDefaultStore().setCalendarColor(calendarId, color)
+export const setCalendarVisibility = (calendarId, visible) =>
+  getDefaultStore().setCalendarVisibility(calendarId, visible)
+export const hideCalendarEvent = (event) => getDefaultStore().hideEvent(event)
+export const restoreHiddenCalendarEvent = (key) => getDefaultStore().restoreHiddenEvent(key)
