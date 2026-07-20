@@ -1,9 +1,16 @@
 import { createServer } from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { shell } from 'electron'
 import { OAuth2Client } from 'google-auth-library'
 import { google } from 'googleapis'
 import { config } from '../config.js'
-import { getGoogleTokens, setGoogleTokens } from '../tokenStore.js'
+import {
+  clearGoogleTokens,
+  getGoogleAccounts,
+  getGoogleTokens,
+  saveGoogleAccount,
+  setGoogleTokens
+} from '../tokenStore.js'
 import { mapGoogleEvent } from './calendarEventMappers.js'
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
@@ -28,7 +35,7 @@ function persistTokensOnRefresh(client, accountLabel) {
   })
 }
 
-export function startOAuthFlow(accountLabel) {
+export function startOAuthFlow(existingAccountId) {
   if (!config.google.clientId || !config.google.clientSecret) {
     return Promise.reject(
       new Error('Missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET — copy .env.example to .env and fill it in')
@@ -37,6 +44,8 @@ export function startOAuthFlow(accountLabel) {
 
   return new Promise((resolve, reject) => {
     let oAuth2Client
+    const requestedAccountId = existingAccountId || randomUUID()
+    const oauthState = randomUUID()
 
     const server = createServer((req, res) => {
       if (!req.url.startsWith('/oauth2callback')) {
@@ -47,6 +56,7 @@ export function startOAuthFlow(accountLabel) {
       const qs = new URL(req.url, `http://127.0.0.1:${server.address().port}`).searchParams
       const code = qs.get('code')
       const error = qs.get('error')
+      const returnedState = qs.get('state')
 
       res.end(
         error
@@ -60,14 +70,32 @@ export function startOAuthFlow(accountLabel) {
         return
       }
 
+      if (returnedState !== oauthState) {
+        reject(new Error('Google OAuth state did not match'))
+        return
+      }
+
       oAuth2Client
         .getToken(code)
-        .then(({ tokens }) => {
+        .then(async ({ tokens }) => {
           oAuth2Client.setCredentials(tokens)
-          setGoogleTokens(accountLabel, tokens)
-          persistTokensOnRefresh(oAuth2Client, accountLabel)
-          clients.set(accountLabel, oAuth2Client)
-          resolve()
+          const calendarApi = google.calendar({ version: 'v3', auth: oAuth2Client })
+          const calendars = await listGoogleCalendars(calendarApi)
+          const primary = calendars.find(({ primary }) => primary) ?? calendars[0]
+          const existingAccount = existingAccountId
+            ? null
+            : getGoogleAccounts(config.google.accountLabels)
+                .find(({ email }) => email && email === primary?.id)
+          const account = {
+            id: existingAccount?.id ?? requestedAccountId,
+            label: primary?.summaryOverride ?? primary?.summary ?? primary?.id ?? 'Google account',
+            email: primary?.id
+          }
+
+          saveGoogleAccount(account, tokens)
+          persistTokensOnRefresh(oAuth2Client, account.id)
+          clients.set(account.id, oAuth2Client)
+          resolve(account)
         })
         .catch(reject)
     })
@@ -80,7 +108,8 @@ export function startOAuthFlow(accountLabel) {
       const authorizeUrl = oAuth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
-        prompt: 'consent'
+        prompt: 'consent',
+        state: oauthState
       })
       shell.openExternal(authorizeUrl)
     })
@@ -119,18 +148,36 @@ async function listGoogleCalendars(calendarApi) {
 
 export async function fetchGoogleEvents(rangeStart, rangeEnd) {
   const events = []
+  const sourceCalendars = []
   const statuses = []
 
-  for (const accountLabel of config.google.accountLabels) {
+  const accounts = getGoogleAccounts(config.google.accountLabels)
+
+  for (const account of accounts) {
     try {
-      const client = await getAuthClient(accountLabel)
+      const client = await getAuthClient(account.id)
       if (!client) {
-        statuses.push({ source: 'google', sourceAccountId: accountLabel, ok: false, lastError: 'not-connected' })
+        statuses.push({
+          source: 'google',
+          sourceAccountId: account.id,
+          sourceAccountName: account.label,
+          ok: false,
+          lastError: 'not-connected'
+        })
         continue
       }
 
       const calendar = google.calendar({ version: 'v3', auth: client })
       const calendars = await listGoogleCalendars(calendar)
+      sourceCalendars.push(...calendars.map((calendarEntry) => ({
+        source: 'google',
+        sourceAccountId: account.id,
+        sourceAccountName: account.label,
+        calendarId: `google:${account.id}:${calendarEntry.id}`,
+        calendarName: calendarEntry.summaryOverride ?? calendarEntry.summary ?? calendarEntry.id,
+        calendarDefaultColor: calendarEntry.backgroundColor ?? '#3858e9',
+        calendarDefaultVisible: Boolean(calendarEntry.primary)
+      })))
       const calendarEvents = await Promise.all(
         calendars.map(async (calendarEntry) => {
           const response = await calendar.events.list({
@@ -142,7 +189,7 @@ export async function fetchGoogleEvents(rangeStart, rangeEnd) {
           })
 
           return (response.data.items ?? []).map((item) =>
-            mapGoogleEvent(item, accountLabel, calendarEntry)
+            mapGoogleEvent(item, account.id, calendarEntry)
           )
         })
       )
@@ -150,19 +197,26 @@ export async function fetchGoogleEvents(rangeStart, rangeEnd) {
       events.push(...calendarEvents.flat())
       statuses.push({
         source: 'google',
-        sourceAccountId: accountLabel,
+        sourceAccountId: account.id,
+        sourceAccountName: account.label,
         ok: true,
         lastSyncedAt: new Date().toISOString()
       })
     } catch (err) {
       statuses.push({
         source: 'google',
-        sourceAccountId: accountLabel,
+        sourceAccountId: account.id,
+        sourceAccountName: account.label,
         ok: false,
         lastError: err.message
       })
     }
   }
 
-  return { events, statuses }
+  return { events, calendars: sourceCalendars, statuses }
+}
+
+export function disconnectGoogleAccount(accountId) {
+  clients.delete(accountId)
+  clearGoogleTokens(accountId)
 }

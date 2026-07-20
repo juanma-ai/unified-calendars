@@ -1,6 +1,14 @@
 import { ipcMain, shell } from 'electron'
-import { getSourceStatus, getStartupCache, getUnifiedEvents } from './aggregator.js'
-import { startOAuthFlow } from './sources/google.js'
+import {
+  getAvailableCalendars,
+  getSourceStatus,
+  getStartupCache,
+  getUnifiedEvents,
+  invalidateSourceCache
+} from './aggregator.js'
+import { config } from './config.js'
+import { disconnectGoogleAccount, startOAuthFlow } from './sources/google.js'
+import { getGoogleAccounts } from './tokenStore.js'
 import {
   getCalendarPreferences,
   hideCalendarEvent,
@@ -22,12 +30,30 @@ export function registerIpcHandlers() {
     return getSourceStatus()
   })
 
+  ipcMain.handle('calendar:getAvailableCalendars', () => {
+    return getAvailableCalendars()
+  })
+
   ipcMain.handle('calendar:refreshNow', (_event, rangeStart, rangeEnd) => {
     return getUnifiedEvents(rangeStart, rangeEnd, { force: true })
   })
 
   ipcMain.handle('calendar:startGoogleOAuth', (_event, accountLabel) => {
     return startOAuthFlow(accountLabel)
+  })
+
+  ipcMain.handle('accounts:getGoogle', () => {
+    return getGoogleAccounts(config.google.accountLabels)
+  })
+
+  ipcMain.handle('accounts:connectGoogle', () => {
+    return startOAuthFlow()
+  })
+
+  ipcMain.handle('accounts:disconnectGoogle', (_event, accountId) => {
+    disconnectGoogleAccount(accountId)
+    invalidateSourceCache('google')
+    return getGoogleAccounts(config.google.accountLabels)
   })
 
   ipcMain.handle('calendar:openExternal', (_event, value) => {

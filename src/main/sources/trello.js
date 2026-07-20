@@ -35,6 +35,13 @@ export async function fetchTrelloEvents(rangeStart, rangeEnd) {
 
     const boards = await fetchBoards()
     const cardsPerBoard = await Promise.all(boards.map(fetchBoardCards))
+    const calendars = boards.map((board) => ({
+      source: 'trello',
+      calendarId: `trello:${board.id}`,
+      calendarName: board.name,
+      calendarDefaultColor: '#9b7a00',
+      calendarDefaultVisible: false
+    }))
 
     // Trello has no server-side "has a due date in this range" filter, so fetch
     // each board's open cards and narrow down client-side.
@@ -49,7 +56,11 @@ export async function fetchTrelloEvents(rangeStart, rangeEnd) {
           .map((card) => mapTrelloCard(card, board))
       )
 
-    return { events, statuses: [{ source: 'trello', ok: true, lastSyncedAt: new Date().toISOString() }] }
+    return {
+      events,
+      calendars,
+      statuses: [{ source: 'trello', ok: true, lastSyncedAt: new Date().toISOString() }]
+    }
   } catch (err) {
     return { events: [], statuses: [{ source: 'trello', ok: false, lastError: err.message }] }
   }

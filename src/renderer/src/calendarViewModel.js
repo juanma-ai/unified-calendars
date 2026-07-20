@@ -17,9 +17,22 @@ function isCalendarVisible(event, preferences) {
   return Boolean(event.calendarDefaultVisible)
 }
 
-export function buildCalendars(events, preferenceValue) {
+export function buildCalendars(events, preferenceValue, availableCalendars = []) {
   const preferences = normalizedPreferences(preferenceValue)
   const calendars = new Map()
+
+  for (const calendar of availableCalendars) {
+    calendars.set(calendar.calendarId, {
+      id: calendar.calendarId,
+      source: calendar.source,
+      ...(calendar.sourceAccountId ? { sourceAccountId: calendar.sourceAccountId } : {}),
+      ...(calendar.sourceAccountName ? { sourceAccountName: calendar.sourceAccountName } : {}),
+      name: calendar.calendarName,
+      color: preferences.calendarColors[calendar.calendarId] ?? calendar.calendarDefaultColor,
+      count: 0,
+      visible: isCalendarVisible(calendar, preferences)
+    })
+  }
 
   for (const event of events) {
     if (!event.calendarId) continue
@@ -32,6 +45,8 @@ export function buildCalendars(events, preferenceValue) {
     calendars.set(event.calendarId, {
       id: event.calendarId,
       source: event.source,
+      ...(event.sourceAccountId ? { sourceAccountId: event.sourceAccountId } : {}),
+      ...(event.sourceAccountName ? { sourceAccountName: event.sourceAccountName } : {}),
       name: event.calendarName,
       color: preferences.calendarColors[event.calendarId] ?? event.calendarDefaultColor,
       count: 1,

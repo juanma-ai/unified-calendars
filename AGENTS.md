@@ -6,3 +6,5 @@
 - When renderer state depends on a main-process refresh, await the refresh before requesting derived status; parallel IPC calls can display stale status even when the underlying integration succeeds.
 - For the calendar UI redesign, use `@wordpress/components` for standard controls, menus, popovers, dialogs, notices, and color selection wherever an equivalent exists; create custom components only for calendar-specific layout and event rendering.
 - The calendar sidebar must keep its header and source statuses fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
+- Keep account connections and persistent source configuration in a dedicated Settings screen; reserve the calendar sidebar for quick visibility filtering, colors, search, and hidden-event access.
+- The calendar sidebar must expose a clearly labeled text Settings action and must not rely on clipped footer text or icon-only controls for critical account-connection guidance.

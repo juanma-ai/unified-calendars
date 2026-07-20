@@ -8,12 +8,33 @@ import {
   FlexItem,
   SearchControl
 } from '@wordpress/components'
-import { seen } from '@wordpress/icons'
+import { seen, settings } from '@wordpress/icons'
 
 const SOURCE_LABELS = {
   google: 'Google Calendar',
   trello: 'Trello',
   reminders: 'Reminders'
+}
+
+function compactAccountLabel(value) {
+  if (!value) return ''
+  if (!value.includes('@')) return value
+  return value.split('@')[0]
+}
+
+function getStatusText(status) {
+  const accountLabel = compactAccountLabel(status.sourceAccountName ?? status.sourceAccountId)
+  const sourceLabel = accountLabel
+    ? `${SOURCE_LABELS[status.source]} (${accountLabel})`
+    : SOURCE_LABELS[status.source]
+
+  if (status.ok) return `${sourceLabel}: ok`
+
+  if (status.source === 'google') {
+    return `${sourceLabel}: connect in Settings`
+  }
+
+  return `${sourceLabel}: ${status.lastError ?? 'error'}`
 }
 
 function CalendarRow({ calendar, index, onColorChange, onVisibilityChange }) {
@@ -60,20 +81,16 @@ function CalendarRow({ calendar, index, onColorChange, onVisibilityChange }) {
   )
 }
 
-function SourceStatus({ status, onReconnectGoogle }) {
-  const label = status.sourceAccountId
-    ? `${SOURCE_LABELS[status.source]} (${status.sourceAccountId})`
-    : SOURCE_LABELS[status.source]
+function SourceStatus({ status }) {
+  const text = getStatusText(status)
 
   return (
-    <div className={`calendar-sidebar__status ${status.ok ? 'is-ok' : 'is-error'}`}>
+    <div
+      className={`calendar-sidebar__status ${status.ok ? 'is-ok' : 'is-error'}`}
+      title={status.lastError ?? text}
+    >
       <span className="calendar-sidebar__status-dot" aria-hidden="true" />
-      <span>{label}: {status.ok ? 'ok' : status.lastError ?? 'error'}</span>
-      {status.source === 'google' && !status.ok && (
-        <Button variant="link" onClick={() => onReconnectGoogle(status.sourceAccountId)}>
-          Connect
-        </Button>
-      )}
+      <span>{text}</span>
     </div>
   )
 }
@@ -83,6 +100,7 @@ export function CalendarSidebar({
   hiddenEventCount,
   onColorChange,
   onOpenHiddenEvents,
+  onOpenSettings,
   onReconnectGoogle,
   onVisibilityChange,
   searchQuery,
@@ -91,7 +109,17 @@ export function CalendarSidebar({
 }) {
   return (
     <aside className="calendar-sidebar">
-      <header className="calendar-sidebar__header">Calendar</header>
+      <header className="calendar-sidebar__header">
+        <span>Calendar</span>
+        <Button
+          icon={settings}
+          label="Open settings"
+          text="Settings"
+          onClick={onOpenSettings}
+          showTooltip
+          variant="tertiary"
+        />
+      </header>
       <div className="calendar-sidebar__body">
         <SearchControl
           label="Search events"
@@ -104,20 +132,38 @@ export function CalendarSidebar({
         <div className="calendar-sidebar__scroll-area">
           {Object.entries(SOURCE_LABELS).map(([source, label]) => {
             const sourceCalendars = calendars.filter((calendar) => calendar.source === source)
-            if (sourceCalendars.length === 0) return null
+            const isGoogle = source === 'google'
+            const isTrello = source === 'trello'
 
             return (
               <section className="calendar-sidebar__section" key={source}>
                 <h2>{label}</h2>
-                {sourceCalendars.map((calendar, index) => (
-                  <CalendarRow
-                    calendar={calendar}
-                    index={`${source}-${index}`}
-                    key={calendar.id}
-                    onColorChange={onColorChange}
-                    onVisibilityChange={onVisibilityChange}
-                  />
-                ))}
+                {sourceCalendars.length > 0 ? (
+                  sourceCalendars.map((calendar, index) => (
+                    <CalendarRow
+                      calendar={calendar}
+                      index={`${source}-${index}`}
+                      key={calendar.id}
+                      onColorChange={onColorChange}
+                      onVisibilityChange={onVisibilityChange}
+                    />
+                  ))
+                ) : (
+                  <div className="calendar-sidebar__empty-state">
+                    <p>
+                      {isGoogle && 'No Google calendars are connected yet.'}
+                      {isTrello && 'No Trello boards are available yet.'}
+                      {!isGoogle && !isTrello && 'No calendars are available here yet.'}
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={onOpenSettings}
+                    >
+                      {isGoogle ? 'Connect Google in Settings' : 'Open Settings'}
+                    </Button>
+                  </div>
+                )}
               </section>
             )
           })}
@@ -134,7 +180,6 @@ export function CalendarSidebar({
           <SourceStatus
             key={`${status.source}:${status.sourceAccountId ?? ''}`}
             status={status}
-            onReconnectGoogle={onReconnectGoogle}
           />
         ))}
       </footer>

@@ -22,6 +22,7 @@ const FETCHERS = {
 const cache = new Map()
 
 let lastStatuses = []
+let lastCalendars = []
 
 async function fetchSource(source, rangeStart, rangeEnd, force) {
   const cached = cache.get(source)
@@ -44,7 +45,14 @@ async function fetchSource(source, rangeStart, rangeEnd, force) {
     return stale
   }
 
-  const entry = { rangeStart, rangeEnd, events: result.events, statuses: result.statuses, fetchedAt: Date.now() }
+  const entry = {
+    rangeStart,
+    rangeEnd,
+    events: result.events,
+    calendars: result.calendars ?? [],
+    statuses: result.statuses,
+    fetchedAt: Date.now()
+  }
   cache.set(source, entry)
   return entry
 }
@@ -55,15 +63,35 @@ export async function getUnifiedEvents(rangeStart, rangeEnd, { force = false } =
   )
 
   lastStatuses = sources.flatMap((s) => s.statuses)
+  lastCalendars = sources.flatMap((s) => s.calendars ?? [])
   const events = sources.flatMap((s) => s.events).sort((a, b) => new Date(a.start) - new Date(b.start))
 
-  store.set('lastGoodCache', { rangeStart, rangeEnd, events, statuses: lastStatuses, savedAt: Date.now() })
+  store.set('lastGoodCache', {
+    rangeStart,
+    rangeEnd,
+    events,
+    calendars: lastCalendars,
+    statuses: lastStatuses,
+    savedAt: Date.now()
+  })
 
   return events
 }
 
 export function getSourceStatus() {
   return lastStatuses
+}
+
+export function getAvailableCalendars() {
+  return lastCalendars
+}
+
+export function invalidateSourceCache(source) {
+  cache.delete(source)
+  if (source === 'google') {
+    lastCalendars = lastCalendars.filter((calendar) => calendar.source !== 'google')
+    lastStatuses = lastStatuses.filter((status) => status.source !== 'google')
+  }
 }
 
 export function getStartupCache() {

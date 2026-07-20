@@ -19,6 +19,9 @@ system and `@wordpress/components`.
 - The event menu can hide one occurrence or an entire recurring series. Hidden
   events can be restored from the hidden-events dialog.
 - Calendar visibility, colors, and hidden events are saved locally.
+- Open **Settings** from the gear button beside the Calendar heading. Use
+  **Connections** for accounts and permissions, **Calendars** to choose which
+  calendars and boards are visible, and **Hidden events** to restore exclusions.
 
 ## Setup
 
@@ -63,8 +66,16 @@ sufficient for reliable Reminders permission handling.
    GOOGLE_CLIENT_ID=...
    GOOGLE_CLIENT_SECRET=...
    ```
-3. To connect more than one Google account, set `GOOGLE_ACCOUNTS` to a comma-separated list of labels, e.g. `GOOGLE_ACCOUNTS=personal,work`. Each label gets its own OAuth flow and stored token.
-4. Build and open the packaged app, then click **Connect** next to `google` in the status bar for each account label and complete the consent flow in your browser.
+3. Build and open the packaged app, open **Settings → Connections**, and select
+   **Connect another account**. Complete the consent flow in your browser.
+4. Repeat the previous step for every Google account. Each account receives its
+   own stored OAuth tokens and all of its calendars are listed separately.
+5. Open **Settings → Calendars** (or use the sidebar) to enable the individual
+   calendars you want to display. Only the primary calendar of a newly connected
+   account is enabled by default.
+
+`GOOGLE_ACCOUNTS` remains supported for installations created before in-app
+account management. New installations do not need to add labels there.
 
 Tokens are stored locally via `electron-store` (in the Electron app's user data directory) — nothing is sent anywhere except Google's API.
 
@@ -80,8 +91,13 @@ Tokens are stored locally via `electron-store` (in the Electron app's user data 
    TRELLO_API_KEY=...
    TRELLO_TOKEN=...
    ```
-4. By default, cards with due dates are pulled from every open board the token can see. To limit it to specific boards, set `TRELLO_BOARD_IDS` to a comma-separated list of board IDs.
-5. No in-app connect step is needed. Rebuild with `npm run package:mac`, reopen the app, and click **Refresh now**.
+4. Leave `TRELLO_BOARD_IDS` blank to make every open board visible to the app.
+   A single Trello token authorizes all boards that account can access; separate
+   tokens are not required for each board. To prevent some boards from being
+   fetched at all, set `TRELLO_BOARD_IDS` to a comma-separated list of IDs.
+5. Rebuild with `npm run package:mac`, reopen the app, and click **Refresh now**.
+6. Open **Settings → Calendars** and enable as many Trello boards as you want.
+   Boards appear there even when they have no cards due during the displayed week.
 
 ## Running
 

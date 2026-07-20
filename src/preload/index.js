@@ -5,8 +5,12 @@ contextBridge.exposeInMainWorld('calendarAPI', {
     ipcRenderer.invoke('calendar:getUnifiedEvents', rangeStart, rangeEnd),
   getCachedEvents: () => ipcRenderer.invoke('calendar:getCachedEvents'),
   getSourceStatus: () => ipcRenderer.invoke('calendar:getSourceStatus'),
+  getAvailableCalendars: () => ipcRenderer.invoke('calendar:getAvailableCalendars'),
   refreshNow: (rangeStart, rangeEnd) => ipcRenderer.invoke('calendar:refreshNow', rangeStart, rangeEnd),
   startGoogleOAuth: (accountLabel) => ipcRenderer.invoke('calendar:startGoogleOAuth', accountLabel),
+  getGoogleAccounts: () => ipcRenderer.invoke('accounts:getGoogle'),
+  connectGoogleAccount: () => ipcRenderer.invoke('accounts:connectGoogle'),
+  disconnectGoogleAccount: (accountId) => ipcRenderer.invoke('accounts:disconnectGoogle', accountId),
   openExternal: (url) => ipcRenderer.invoke('calendar:openExternal', url),
   getPreferences: () => ipcRenderer.invoke('preferences:get'),
   setCalendarColor: (calendarId, color) =>
