@@ -3,6 +3,7 @@ import Store from 'electron-store'
 const PREFERENCES_KEY = 'calendarPreferences'
 const DEFAULT_PREFERENCES = {
   calendarColors: {},
+  calendarSidebarVisibility: {},
   calendarVisibility: {},
   hiddenCalendars: [],
   hiddenEvents: []
@@ -11,6 +12,7 @@ const DEFAULT_PREFERENCES = {
 function normalize(value = {}) {
   return {
     calendarColors: value.calendarColors ?? {},
+    calendarSidebarVisibility: value.calendarSidebarVisibility ?? {},
     calendarVisibility: value.calendarVisibility ?? {},
     hiddenCalendars: value.hiddenCalendars ?? [],
     hiddenEvents: value.hiddenEvents ?? []
@@ -31,10 +33,20 @@ export function createCalendarPreferencesStore(storage) {
       return get()
     },
 
+    setCalendarSidebarVisibility(calendarId, visible) {
+      const preferences = get()
+      preferences.calendarSidebarVisibility[calendarId] = visible
+      preferences.hiddenCalendars = preferences.hiddenCalendars.filter((id) => id !== calendarId)
+      save(preferences)
+      return get()
+    },
+
     setCalendarVisibility(calendarId, visible) {
       const preferences = get()
+      if (!Object.prototype.hasOwnProperty.call(preferences.calendarSidebarVisibility, calendarId)) {
+        preferences.calendarSidebarVisibility[calendarId] = true
+      }
       preferences.calendarVisibility[calendarId] = visible
-      preferences.hiddenCalendars = preferences.hiddenCalendars.filter((id) => id !== calendarId)
       save(preferences)
       return get()
     },
@@ -79,6 +91,8 @@ function getDefaultStore() {
 export const getCalendarPreferences = () => getDefaultStore().get()
 export const setCalendarColor = (calendarId, color) =>
   getDefaultStore().setCalendarColor(calendarId, color)
+export const setCalendarSidebarVisibility = (calendarId, visible) =>
+  getDefaultStore().setCalendarSidebarVisibility(calendarId, visible)
 export const setCalendarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarVisibility(calendarId, visible)
 export const hideCalendarEvent = (event) => getDefaultStore().hideEvent(event)

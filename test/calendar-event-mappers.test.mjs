@@ -41,3 +41,30 @@ test('Trello cards retain their board identity', () => {
   assert.equal(event.calendarDefaultVisible, false)
   assert.equal(event.seriesId, null)
 })
+
+test('Trello cards include assignee metadata and assigned-to-me state', () => {
+  const event = mapTrelloCard(
+    {
+      id: 'card-1',
+      idMembers: ['member-me', 'member-ana'],
+      name: 'Ship release',
+      due: '2026-07-23T12:00:00.000Z',
+      dueComplete: false,
+      shortUrl: 'https://trello.com/c/card-1'
+    },
+    { id: 'board-1', name: 'Editorial board' },
+    {
+      currentMemberId: 'member-me',
+      membersById: new Map([
+        ['member-me', { id: 'member-me', fullName: 'JuanMa Garrido', initials: 'JG', username: 'juanma' }],
+        ['member-ana', { id: 'member-ana', fullName: 'Ana Lopez', initials: 'AL', username: 'ana' }]
+      ])
+    }
+  )
+
+  assert.equal(event.assignedToMe, true)
+  assert.deepEqual(event.assignees, [
+    { id: 'member-me', name: 'JuanMa Garrido', initials: 'JG', username: 'juanma', isMe: true },
+    { id: 'member-ana', name: 'Ana Lopez', initials: 'AL', username: 'ana', isMe: false }
+  ])
+})

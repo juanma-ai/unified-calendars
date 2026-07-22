@@ -154,13 +154,13 @@ export function SettingsScreen({
                 <CardBody>
                   {calendars.length > 0 ? (
                     <>
-                      <p>{calendars.length} calendars and boards are available.</p>
+                      <p>Select the calendars and boards that appear in the sidebar.</p>
                       <div className="settings-calendar-list">
                         {calendars.map((calendar) => (
                           <Flex className="settings-calendar" key={calendar.id}>
                             <FlexItem>
                               <CheckboxControl
-                                checked={calendar.visible}
+                                checked={calendar.sidebarVisible}
                                 onChange={(visible) => onVisibilityChange(calendar.id, visible)}
                                 __nextHasNoMarginBottom
                               />

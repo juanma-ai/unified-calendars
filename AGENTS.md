@@ -8,3 +8,8 @@
 - The calendar sidebar must keep its header and source statuses fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
 - Keep account connections and persistent source configuration in a dedicated Settings screen; reserve the calendar sidebar for quick visibility filtering, colors, search, and hidden-event access.
 - The calendar sidebar must expose a clearly labeled text Settings action and must not rely on clipped footer text or icon-only controls for critical account-connection guidance.
+- Quick hide/show actions in the calendar sidebar must never remove a calendar from the sidebar; hidden calendars selected in Settings must remain listed with muted text.
+- Calendar sidebar row overflow actions must use the standard three-dots menu affordance without custom square-button styling.
+- Calendar sidebar row overflow menus must reveal the three-dots trigger on row hover or focus, but only open the options menu after trigger click or keyboard activation.
+- Calendar sidebar row overflow triggers must match Gutenberg List View's options button pattern: `moreVertical` icon, `Options` label, small button size, and `block-editor-list-view-block__menu` on the toggle button.
+- Trello cards not assigned to the current user should be visually de-emphasized enough to be obvious at calendar-grid density; a 30% lighter background is too subtle, so use a stronger distinction such as 60% lightening.

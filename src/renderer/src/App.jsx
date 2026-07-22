@@ -11,6 +11,7 @@ import { buildCalendars, filterVisibleEvents } from './calendarViewModel.js'
 const POLL_INTERVAL_MS = 60 * 1000
 const DEFAULT_PREFERENCES = {
   calendarColors: {},
+  calendarSidebarVisibility: {},
   calendarVisibility: {},
   hiddenCalendars: [],
   hiddenEvents: []
@@ -32,6 +33,17 @@ export function App() {
   const calendars = useMemo(
     () => buildCalendars(events, preferences, availableCalendars),
     [availableCalendars, events, preferences]
+  )
+  const sidebarCalendars = useMemo(
+    () => calendars.filter((calendar) => calendar.sidebarVisible),
+    [calendars]
+  )
+  const calendarCountBySource = useMemo(
+    () => calendars.reduce((counts, calendar) => ({
+      ...counts,
+      [calendar.source]: (counts[calendar.source] ?? 0) + 1
+    }), {}),
+    [calendars]
   )
   const visibleEvents = useMemo(
     () => filterVisibleEvents(events, preferences, searchQuery),
@@ -99,6 +111,10 @@ export function App() {
     window.calendarAPI.setCalendarColor(calendarId, color).then(setPreferences)
   }, [])
 
+  const handleCalendarSidebarVisibility = useCallback((calendarId, visible) => {
+    window.calendarAPI.setCalendarSidebarVisibility(calendarId, visible).then(setPreferences)
+  }, [])
+
   const handleCalendarVisibility = useCallback((calendarId, visible) => {
     window.calendarAPI.setCalendarVisibility(calendarId, visible).then(setPreferences)
   }, [])
@@ -147,7 +163,7 @@ export function App() {
           onDisconnectGoogle={handleDisconnectGoogle}
           onOpenHiddenEvents={() => setHiddenEventsOpen(true)}
           onReconnectGoogle={handleReconnectGoogle}
-          onVisibilityChange={handleCalendarVisibility}
+          onVisibilityChange={handleCalendarSidebarVisibility}
           statuses={statuses}
         />
         <HiddenEventsModal
@@ -163,7 +179,8 @@ export function App() {
   return (
     <div className="app">
       <CalendarSidebar
-        calendars={calendars}
+        calendars={sidebarCalendars}
+        calendarCountBySource={calendarCountBySource}
         hiddenEventCount={preferences.hiddenEvents.length}
         onColorChange={handleCalendarColor}
         onOpenHiddenEvents={() => setHiddenEventsOpen(true)}

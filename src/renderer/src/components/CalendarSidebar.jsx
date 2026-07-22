@@ -1,14 +1,17 @@
+import { useState } from 'react'
 import {
   Button,
-  CheckboxControl,
   ColorPicker,
   Dropdown,
+  DropdownMenu,
   Flex,
   FlexBlock,
   FlexItem,
+  MenuGroup,
+  MenuItem,
   SearchControl
 } from '@wordpress/components'
-import { seen, settings } from '@wordpress/icons'
+import { moreVertical, seen, settings, unseen } from '@wordpress/icons'
 
 const SOURCE_LABELS = {
   google: 'Google Calendar',
@@ -37,19 +40,15 @@ function getStatusText(status) {
   return `${sourceLabel}: ${status.lastError ?? 'error'}`
 }
 
-function CalendarRow({ calendar, index, onColorChange, onVisibilityChange }) {
-  const checkboxId = `calendar-visibility-${index}`
+function CalendarRow({ calendar, onColorChange, onVisibilityChange }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <Flex className="calendar-sidebar__calendar" gap={2} justify="flex-start">
-      <FlexItem>
-        <CheckboxControl
-          id={checkboxId}
-          checked={calendar.visible}
-          onChange={(visible) => onVisibilityChange(calendar.id, visible)}
-          __nextHasNoMarginBottom
-        />
-      </FlexItem>
+    <Flex
+      className={`calendar-sidebar__calendar${calendar.visible ? '' : ' is-hidden'}${isMenuOpen ? ' is-menu-open' : ''}`}
+      gap={2}
+      justify="flex-start"
+    >
       <FlexItem>
         <Dropdown
           contentClassName="calendar-color-popover"
@@ -72,11 +71,37 @@ function CalendarRow({ calendar, index, onColorChange, onVisibilityChange }) {
         />
       </FlexItem>
       <FlexBlock>
-        <label className="calendar-sidebar__calendar-name" htmlFor={checkboxId}>
+        <span className="calendar-sidebar__calendar-name">
           {calendar.name}
-        </label>
+        </span>
       </FlexBlock>
       <FlexItem className="calendar-sidebar__count">{calendar.count}</FlexItem>
+      <FlexItem className="calendar-sidebar__calendar-menu">
+        <DropdownMenu
+          icon={moreVertical}
+          label="Options"
+          onToggle={setIsMenuOpen}
+          popoverProps={{ placement: 'right-start' }}
+          toggleProps={{
+            className: 'block-editor-list-view-block__menu',
+            size: 'small'
+          }}
+        >
+          {({ onClose }) => (
+            <MenuGroup>
+              <MenuItem
+                icon={calendar.visible ? unseen : seen}
+                onClick={() => {
+                  onVisibilityChange(calendar.id, !calendar.visible)
+                  onClose()
+                }}
+              >
+                {calendar.visible ? 'Hide' : 'Show'}
+              </MenuItem>
+            </MenuGroup>
+          )}
+        </DropdownMenu>
+      </FlexItem>
     </Flex>
   )
 }
@@ -97,6 +122,7 @@ function SourceStatus({ status }) {
 
 export function CalendarSidebar({
   calendars,
+  calendarCountBySource,
   hiddenEventCount,
   onColorChange,
   onOpenHiddenEvents,
@@ -132,6 +158,7 @@ export function CalendarSidebar({
         <div className="calendar-sidebar__scroll-area">
           {Object.entries(SOURCE_LABELS).map(([source, label]) => {
             const sourceCalendars = calendars.filter((calendar) => calendar.source === source)
+            const hasAvailableCalendars = Boolean(calendarCountBySource[source])
             const isGoogle = source === 'google'
             const isTrello = source === 'trello'
 
@@ -142,7 +169,6 @@ export function CalendarSidebar({
                   sourceCalendars.map((calendar, index) => (
                     <CalendarRow
                       calendar={calendar}
-                      index={`${source}-${index}`}
                       key={calendar.id}
                       onColorChange={onColorChange}
                       onVisibilityChange={onVisibilityChange}
@@ -151,16 +177,17 @@ export function CalendarSidebar({
                 ) : (
                   <div className="calendar-sidebar__empty-state">
                     <p>
-                      {isGoogle && 'No Google calendars are connected yet.'}
-                      {isTrello && 'No Trello boards are available yet.'}
-                      {!isGoogle && !isTrello && 'No calendars are available here yet.'}
+                      {hasAvailableCalendars && `${label} calendars are hidden from the sidebar.`}
+                      {!hasAvailableCalendars && isGoogle && 'No Google calendars are connected yet.'}
+                      {!hasAvailableCalendars && isTrello && 'No Trello boards are available yet.'}
+                      {!hasAvailableCalendars && !isGoogle && !isTrello && 'No calendars are available here yet.'}
                     </p>
                     <Button
                       variant="secondary"
                       size="small"
                       onClick={onOpenSettings}
                     >
-                      {isGoogle ? 'Connect Google in Settings' : 'Open Settings'}
+                      {hasAvailableCalendars ? 'Manage calendars' : isGoogle ? 'Connect Google in Settings' : 'Open Settings'}
                     </Button>
                   </div>
                 )}

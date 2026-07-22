@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   getPreferences: () => ipcRenderer.invoke('preferences:get'),
   setCalendarColor: (calendarId, color) =>
     ipcRenderer.invoke('preferences:setCalendarColor', calendarId, color),
+  setCalendarSidebarVisibility: (calendarId, visible) =>
+    ipcRenderer.invoke('preferences:setCalendarSidebarVisibility', calendarId, visible),
   setCalendarVisibility: (calendarId, visible) =>
     ipcRenderer.invoke('preferences:setCalendarVisibility', calendarId, visible),
   hideEvent: (hiddenEvent) => ipcRenderer.invoke('preferences:hideEvent', hiddenEvent),
