@@ -4,11 +4,15 @@
 - For macOS TCC-protected APIs, an embedded plist in a bare executable is not a substitute for a LaunchServices-recognizable `.app` bundle; test the bundle identity and usage-description keys before testing permissions.
 - For TCC-sensitive helpers launched by Electron, test with Electron as the responsible parent process; a Node/Terminal adapter test can pass while the identical direct child launch is denied under Electron.
 - When renderer state depends on a main-process refresh, await the refresh before requesting derived status; parallel IPC calls can display stale status even when the underlying integration succeeds.
-- For the calendar UI redesign, use `@wordpress/components` for standard controls, menus, popovers, dialogs, notices, and color selection wherever an equivalent exists; create custom components only for calendar-specific layout and event rendering.
-- The calendar sidebar must keep its header and source statuses fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
+- For the calendar UI redesign, use `@wordpress/ui` for standard controls, menus, popovers, dialogs, notices, and color selection wherever an equivalent exists; create custom components only for calendar-specific layout and event rendering.
+- The calendar sidebar must keep its search field and source statuses fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
 - Keep account connections and persistent source configuration in a dedicated Settings screen; reserve the calendar sidebar for quick visibility filtering, colors, search, and hidden-event access.
 - Calendar selection is two-level: Settings decides which of the account's calendars (e.g. the many calendars available in a Google account) are listed in the sidebar at all, and the sidebar then offers a quick hide/show toggle per listed calendar to control its events in the grid. Neither level replaces the other.
-- The calendar sidebar must expose a clearly labeled text Settings action and must not rely on clipped footer text or icon-only controls for critical account-connection guidance.
+- The app must expose a clearly labeled text Settings action in the global top bar and must not rely on clipped footer text or icon-only controls for critical account-connection guidance.
+- Week navigation, the week range label, the Settings link, and Refresh now live in a single global top bar above the sidebar and grid; do not float those controls over the calendar.
+- The whole sidebar calendar row is the quick hide/show toggle (`aria-pressed`, filled swatch when visible and outlined swatch when hidden); the three-dots menu holds only the color picker, since the row itself already does hide/show.
+- Hidden events are reviewed inline in Settings -> Hidden events, never in a modal; the sidebar link navigates to that tab.
+- Event colors are stored as-is but rendered through `getEventPalette` (`src/renderer/src/eventColors.js`): a soft tint with dark text for light colors and a solid fill with white text for dark ones. It runs after the Trello unassigned lightening, so both distinctions survive. Do not hardcode `color: #fff` on event pills.
 - Quick hide/show actions in the calendar sidebar must never remove a calendar from the sidebar; hidden calendars selected in Settings must remain listed with muted text.
 - Calendar sidebar row overflow actions must use the standard three-dots menu affordance without custom square-button styling.
 - Calendar sidebar row overflow menus must reveal the three-dots trigger on row hover or focus, but only open the options menu after trigger click or keyboard activation.

@@ -2,6 +2,7 @@ import { Button, Dropdown, MenuGroup, MenuItem } from '@wordpress/components'
 import { external } from '@wordpress/icons'
 import { format } from 'date-fns'
 import { getEventColor } from '../calendarViewModel.js'
+import { getEventPalette } from '../eventColors.js'
 
 function getShortAssigneeName(assignee) {
   if (assignee.isMe) return 'You'
@@ -51,6 +52,7 @@ export function EventPill({ event, onHideEvent, preferences, showTime = false })
   const color = getEventColor(event, preferences)
   const assignmentKnown = event.source === 'trello' && Array.isArray(event.assignees)
   const displayColor = assignmentKnown && !event.assignedToMe ? lightenHexColor(color) : color
+  const palette = getEventPalette(displayColor)
   const time = showTime ? format(new Date(event.start), 'HH:mm') : null
   const trelloAssigneeLabel = getTrelloAssigneeLabel(event)
   const trelloDueLabel = event.source === 'trello' ? format(new Date(event.start), 'MMM d, HH:mm') : null
@@ -75,7 +77,7 @@ export function EventPill({ event, onHideEvent, preferences, showTime = false })
           }`}
           aria-label={actionLabel}
           onClick={onToggle}
-          style={{ backgroundColor: displayColor }}
+          style={{ backgroundColor: palette.background, color: palette.text }}
         >
           {time && <span className="event-pill__time">{time}</span>}
           <span className="event-pill__title">{event.title}</span>

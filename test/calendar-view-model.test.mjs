@@ -142,3 +142,24 @@ test('filters calendars, occurrences, series, and search text', () => {
   assert.deepEqual(filterVisibleEvents(events, preferences, ''), [events[1]])
   assert.deepEqual(filterVisibleEvents(events, { ...preferences, hiddenEvents: [] }, 'ship'), [events[1]])
 })
+
+test('quick-hiding a calendar keeps it listed in the sidebar', () => {
+  const events = [
+    {
+      id: 'event-1',
+      source: 'google',
+      calendarId: 'google:work:personal',
+      calendarName: 'Personal',
+      calendarDefaultVisible: true,
+      title: 'Standup',
+      start: '2026-01-05T09:00:00.000Z'
+    }
+  ]
+  // No explicit sidebar preference: the quick hide must not delist the calendar.
+  const preferences = { calendarVisibility: { 'google:work:personal': false } }
+
+  const [calendar] = buildCalendars(events, preferences)
+  assert.equal(calendar.sidebarVisible, true)
+  assert.equal(calendar.visible, false)
+  assert.deepEqual(filterVisibleEvents(events, preferences, ''), [])
+})

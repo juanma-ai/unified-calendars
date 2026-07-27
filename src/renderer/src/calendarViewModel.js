@@ -23,7 +23,11 @@ function isCalendarInSidebar(event, preferences) {
     return preferences.calendarSidebarVisibility[event.calendarId]
   }
   if (preferences.hiddenCalendars.includes(event.calendarId)) return false
-  return isCalendarVisible(event, preferences)
+  // Before sidebar membership existed, enabling a calendar was the only opt-in, so an
+  // explicit `true` still lists it. A quick hide must never delist it: the row stays
+  // in the sidebar, muted, until Settings removes it.
+  if (preferences.calendarVisibility[event.calendarId] === true) return true
+  return Boolean(event.calendarDefaultVisible)
 }
 
 export function buildCalendars(events, preferenceValue, availableCalendars = []) {
