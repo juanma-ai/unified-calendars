@@ -85,6 +85,10 @@ export function App() {
     return () => clearInterval(interval)
   }, [refresh])
 
+  useEffect(() => {
+    return window.calendarAPI.onOpenSettings?.(() => setView('settings'))
+  }, [])
+
   const handleReconnectGoogle = useCallback(
     (accountLabel) => {
       window.calendarAPI

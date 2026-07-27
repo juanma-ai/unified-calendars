@@ -3,6 +3,15 @@ import { addDays, differenceInMinutes, startOfDay } from 'date-fns'
 export const HOUR_HEIGHT = 64
 export const MINIMUM_EVENT_MINUTES = 30
 
+export function getCenteredTimeScrollTop(date, viewportHeight) {
+  const currentMinutes = date.getHours() * 60 + date.getMinutes()
+  const currentTop = (currentMinutes / 60) * HOUR_HEIGHT
+  const gridHeight = 24 * HOUR_HEIGHT
+  const maxScrollTop = Math.max(0, gridHeight - viewportHeight)
+
+  return Math.min(Math.max(0, currentTop - viewportHeight / 2), maxScrollTop)
+}
+
 function timedPosition(event, day) {
   const dayStart = startOfDay(day)
   const dayEnd = addDays(dayStart, 1)

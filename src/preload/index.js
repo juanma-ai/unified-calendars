@@ -20,5 +20,10 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   setCalendarVisibility: (calendarId, visible) =>
     ipcRenderer.invoke('preferences:setCalendarVisibility', calendarId, visible),
   hideEvent: (hiddenEvent) => ipcRenderer.invoke('preferences:hideEvent', hiddenEvent),
-  restoreHiddenEvent: (key) => ipcRenderer.invoke('preferences:restoreHiddenEvent', key)
+  restoreHiddenEvent: (key) => ipcRenderer.invoke('preferences:restoreHiddenEvent', key),
+  onOpenSettings: (callback) => {
+    const listener = () => callback()
+    ipcRenderer.on('calendar:openSettings', listener)
+    return () => ipcRenderer.removeListener('calendar:openSettings', listener)
+  }
 })
