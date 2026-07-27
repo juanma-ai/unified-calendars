@@ -332,12 +332,8 @@ input {
   width: 7px;
   height: 7px;
   margin-top: 5px;
-  background: #008a20;
-  border-radius: 50%;
-}
-
-.calendar-sidebar__status.is-error .calendar-sidebar__status-dot {
   background: #cc1818;
+  border-radius: 50%;
 }
 
 /* Calendar grid */

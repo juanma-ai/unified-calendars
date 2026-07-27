@@ -26,8 +26,6 @@ function getStatusText(status) {
     ? `${SOURCE_LABELS[status.source]} (${accountLabel})`
     : SOURCE_LABELS[status.source]
 
-  if (status.ok) return `${sourceLabel}: ok`
-
   if (status.source === 'google') {
     return `${sourceLabel}: connect in Settings`
   }
@@ -90,10 +88,7 @@ function SourceStatus({ status }) {
   const text = getStatusText(status)
 
   return (
-    <div
-      className={`calendar-sidebar__status ${status.ok ? 'is-ok' : 'is-error'}`}
-      title={status.lastError ?? text}
-    >
+    <div className="calendar-sidebar__status is-error" title={status.lastError ?? text}>
       <span className="calendar-sidebar__status-dot" aria-hidden="true" />
       <span>{text}</span>
     </div>
@@ -111,6 +106,8 @@ export function CalendarSidebar({
   setSearchQuery,
   statuses
 }) {
+  const failingStatuses = statuses.filter((status) => !status.ok)
+
   return (
     <aside className="calendar-sidebar">
       <div className="calendar-sidebar__body">
@@ -179,11 +176,13 @@ export function CalendarSidebar({
           </div>
         </div>
       </div>
-      <footer className="calendar-sidebar__footer">
-        {statuses.map((status) => (
-          <SourceStatus key={`${status.source}:${status.sourceAccountId ?? ''}`} status={status} />
-        ))}
-      </footer>
+      {failingStatuses.length > 0 && (
+        <footer className="calendar-sidebar__footer">
+          {failingStatuses.map((status) => (
+            <SourceStatus key={`${status.source}:${status.sourceAccountId ?? ''}`} status={status} />
+          ))}
+        </footer>
+      )}
     </aside>
   )
 }

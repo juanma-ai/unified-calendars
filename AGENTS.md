@@ -5,7 +5,8 @@
 - For TCC-sensitive helpers launched by Electron, test with Electron as the responsible parent process; a Node/Terminal adapter test can pass while the identical direct child launch is denied under Electron.
 - When renderer state depends on a main-process refresh, await the refresh before requesting derived status; parallel IPC calls can display stale status even when the underlying integration succeeds.
 - For the calendar UI redesign, use `@wordpress/ui` for standard controls, menus, popovers, dialogs, notices, and color selection wherever an equivalent exists; create custom components only for calendar-specific layout and event rendering.
-- The calendar sidebar must keep its search field and source statuses fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
+- The calendar sidebar must keep its search field fixed while the calendar list scrolls independently, and the weekly calendar must use an hourly time grid with a separate all-day row.
+- The sidebar source-status footer shows only failing sources; when every source is ok it renders nothing. Full per-source status lives in Settings, not the sidebar.
 - Keep account connections and persistent source configuration in a dedicated Settings screen; reserve the calendar sidebar for quick visibility filtering, colors, search, and hidden-event access.
 - Calendar selection is two-level: Settings decides which of the account's calendars (e.g. the many calendars available in a Google account) are listed in the sidebar at all, and the sidebar then offers a quick hide/show toggle per listed calendar to control its events in the grid. Neither level replaces the other.
 - The app must expose a clearly labeled text Settings action in the global top bar and must not rely on clipped footer text or icon-only controls for critical account-connection guidance.
