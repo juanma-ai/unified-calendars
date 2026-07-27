@@ -14,10 +14,7 @@ function timedPosition(event, day) {
   const clampedStart = eventStart < dayStart ? dayStart : eventStart
   const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd
   const startMinutes = Math.max(0, differenceInMinutes(clampedStart, dayStart))
-  const durationMinutes = Math.max(
-    MINIMUM_EVENT_MINUTES,
-    differenceInMinutes(clampedEnd, clampedStart)
-  )
+  const durationMinutes = Math.max(1, differenceInMinutes(clampedEnd, clampedStart))
 
   return {
     event,

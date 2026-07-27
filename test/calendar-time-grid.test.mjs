@@ -16,6 +16,12 @@ test('separates all-day events and positions timed events by minute', () => {
         end: '2026-07-20T10:00:00+02:00'
       },
       {
+        id: 'short-meeting',
+        allDay: false,
+        start: '2026-07-20T10:00:00+02:00',
+        end: '2026-07-20T10:05:00+02:00'
+      },
+      {
         id: 'reminder',
         allDay: false,
         start: '2026-07-20T11:00:00+02:00',
@@ -28,7 +34,8 @@ test('separates all-day events and positions timed events by minute', () => {
   assert.deepEqual(layout.allDayEvents.map((event) => event.id), ['all-day'])
   assert.equal(layout.timedEvents[0].startMinutes, 540)
   assert.equal(layout.timedEvents[0].durationMinutes, 60)
-  assert.equal(layout.timedEvents[1].durationMinutes, 30)
+  assert.equal(layout.timedEvents[1].durationMinutes, 5)
+  assert.equal(layout.timedEvents[2].durationMinutes, 30)
 })
 
 test('places overlapping events into separate columns', () => {

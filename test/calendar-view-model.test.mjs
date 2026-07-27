@@ -40,6 +40,7 @@ test('builds calendars with persisted color and visibility', () => {
     name: 'Personal',
     color: '#3858e9',
     count: 1,
+    sidebarVisible: true,
     visible: true
   })
   assert.equal(calendars[1].visible, false)
@@ -97,12 +98,37 @@ test('builds calendars from the source catalog even when the range has no events
   const calendars = buildCalendars([], {}, catalog)
 
   assert.deepEqual(
-    calendars.map(({ id, count, visible }) => ({ id, count, visible })),
+    calendars.map(({ id, count, sidebarVisible, visible }) => ({ id, count, sidebarVisible, visible })),
     [
-      { id: 'google:juanma-work:team@example.com', count: 0, visible: false },
-      { id: 'trello:juanma-personal-board', count: 0, visible: false }
+      { id: 'google:juanma-work:team@example.com', count: 0, sidebarVisible: false, visible: false },
+      { id: 'trello:juanma-personal-board', count: 0, sidebarVisible: false, visible: false }
     ]
   )
+})
+
+test('separates sidebar membership from quick event visibility', () => {
+  const preferences = {
+    calendarSidebarVisibility: {
+      'google:work:personal': true,
+      'trello:editorial': false
+    },
+    calendarVisibility: {
+      'google:work:personal': false,
+      'trello:editorial': true
+    },
+    hiddenEvents: []
+  }
+
+  const calendars = buildCalendars(events, preferences)
+
+  assert.deepEqual(
+    calendars.map(({ id, sidebarVisible, visible }) => ({ id, sidebarVisible, visible })),
+    [
+      { id: 'google:work:personal', sidebarVisible: true, visible: false },
+      { id: 'trello:editorial', sidebarVisible: false, visible: true }
+    ]
+  )
+  assert.deepEqual(filterVisibleEvents(events, preferences, ''), [])
 })
 
 test('filters calendars, occurrences, series, and search text', () => {
@@ -115,4 +141,25 @@ test('filters calendars, occurrences, series, and search text', () => {
 
   assert.deepEqual(filterVisibleEvents(events, preferences, ''), [events[1]])
   assert.deepEqual(filterVisibleEvents(events, { ...preferences, hiddenEvents: [] }, 'ship'), [events[1]])
+})
+
+test('quick-hiding a calendar keeps it listed in the sidebar', () => {
+  const events = [
+    {
+      id: 'event-1',
+      source: 'google',
+      calendarId: 'google:work:personal',
+      calendarName: 'Personal',
+      calendarDefaultVisible: true,
+      title: 'Standup',
+      start: '2026-01-05T09:00:00.000Z'
+    }
+  ]
+  // No explicit sidebar preference: the quick hide must not delist the calendar.
+  const preferences = { calendarVisibility: { 'google:work:personal': false } }
+
+  const [calendar] = buildCalendars(events, preferences)
+  assert.equal(calendar.sidebarVisible, true)
+  assert.equal(calendar.visible, false)
+  assert.deepEqual(filterVisibleEvents(events, preferences, ''), [])
 })

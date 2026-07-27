@@ -16,12 +16,26 @@ async function fetchBoards() {
   return boards.filter((board) => config.trello.boardIds.includes(board.id))
 }
 
+async function fetchCurrentMember() {
+  const res = await fetch(`${BASE_URL}/members/me?fields=id,fullName,username,initials&${authQuery()}`)
+  if (!res.ok) throw new Error(`Trello current member request failed: ${res.status}`)
+  return res.json()
+}
+
 async function fetchBoardCards(board) {
-  const res = await fetch(
-    `${BASE_URL}/boards/${board.id}/cards?fields=name,due,dueComplete,shortUrl&${authQuery()}`
-  )
-  if (!res.ok) throw new Error(`Trello cards request failed for board ${board.id}: ${res.status}`)
-  return { board, cards: await res.json() }
+  const [cardsRes, membersRes] = await Promise.all([
+    fetch(`${BASE_URL}/boards/${board.id}/cards?fields=name,due,dueComplete,shortUrl,idMembers&${authQuery()}`),
+    fetch(`${BASE_URL}/boards/${board.id}/members?fields=id,fullName,username,initials&${authQuery()}`)
+  ])
+
+  if (!cardsRes.ok) throw new Error(`Trello cards request failed for board ${board.id}: ${cardsRes.status}`)
+  if (!membersRes.ok) throw new Error(`Trello members request failed for board ${board.id}: ${membersRes.status}`)
+
+  return { board, cards: await cardsRes.json(), members: await membersRes.json() }
+}
+
+export function filterIncompleteTrelloCards(cards) {
+  return cards.filter((card) => !card.dueComplete)
 }
 
 export async function fetchTrelloEvents(rangeStart, rangeEnd) {
@@ -33,7 +47,7 @@ export async function fetchTrelloEvents(rangeStart, rangeEnd) {
     const rangeStartMs = new Date(rangeStart).getTime()
     const rangeEndMs = new Date(rangeEnd).getTime()
 
-    const boards = await fetchBoards()
+    const [currentMember, boards] = await Promise.all([fetchCurrentMember(), fetchBoards()])
     const cardsPerBoard = await Promise.all(boards.map(fetchBoardCards))
     const calendars = boards.map((board) => ({
       source: 'trello',
@@ -45,16 +59,19 @@ export async function fetchTrelloEvents(rangeStart, rangeEnd) {
 
     // Trello has no server-side "has a due date in this range" filter, so fetch
     // each board's open cards and narrow down client-side.
-    const events = cardsPerBoard
-      .flatMap(({ board, cards }) =>
-        cards
-          .filter((card) => card.due)
-          .filter((card) => {
-            const dueMs = new Date(card.due).getTime()
-            return dueMs >= rangeStartMs && dueMs <= rangeEndMs
-          })
-          .map((card) => mapTrelloCard(card, board))
-      )
+    const events = cardsPerBoard.flatMap(({ board, cards, members }) => {
+      const membersById = new Map(members.map((member) => [member.id, member]))
+      return filterIncompleteTrelloCards(cards)
+        .filter((card) => card.due)
+        .filter((card) => {
+          const dueMs = new Date(card.due).getTime()
+          return dueMs >= rangeStartMs && dueMs <= rangeEndMs
+        })
+        .map((card) => mapTrelloCard(card, board, {
+          currentMemberId: currentMember.id,
+          membersById
+        }))
+    })
 
     return {
       events,

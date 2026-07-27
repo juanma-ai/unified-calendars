@@ -23,8 +23,25 @@ export function mapGoogleEvent(item, accountLabel, calendar) {
   }
 }
 
-export function mapTrelloCard(card, board) {
+function normalizeTrelloAssignee(memberId, membersById, currentMemberId) {
+  const member = membersById.get(memberId) ?? {}
+  return {
+    id: memberId,
+    name: member.fullName || member.username || member.initials || 'Unknown member',
+    initials: member.initials ?? null,
+    username: member.username ?? null,
+    isMe: Boolean(currentMemberId && memberId === currentMemberId)
+  }
+}
+
+export function mapTrelloCard(card, board, options = {}) {
   const calendarId = `trello:${board.id}`
+  const memberIds = Array.isArray(card.idMembers) ? card.idMembers : []
+  const membersById = options.membersById ?? new Map()
+  const currentMemberId = options.currentMemberId ?? null
+  const assignees = memberIds.map((memberId) =>
+    normalizeTrelloAssignee(memberId, membersById, currentMemberId)
+  )
 
   return {
     source: 'trello',
@@ -40,6 +57,8 @@ export function mapTrelloCard(card, board) {
     allDay: false,
     url: card.shortUrl,
     status: card.dueComplete ? 'completed' : 'confirmed',
+    assignees,
+    assignedToMe: Boolean(currentMemberId && memberIds.includes(currentMemberId)),
     raw: card
   }
 }

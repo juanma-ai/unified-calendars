@@ -63,11 +63,15 @@ function mapReminder(item) {
   }
 }
 
+export function filterIncompleteReminderItems(items) {
+  return items.filter((item) => !item.isCompleted)
+}
+
 export async function fetchRemindersEvents(rangeStart, rangeEnd) {
   try {
     const items = await runHelper(rangeStart, rangeEnd)
     return {
-      events: items.map(mapReminder),
+      events: filterIncompleteReminderItems(items).map(mapReminder),
       statuses: [{ source: 'reminders', ok: true, lastSyncedAt: new Date().toISOString() }]
     }
   } catch (err) {

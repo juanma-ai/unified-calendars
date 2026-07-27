@@ -19,13 +19,27 @@ test('persists calendar colors and visibility', () => {
   const preferences = createCalendarPreferencesStore(memoryStore())
 
   preferences.setCalendarColor('google:work:primary', '#3858e9')
+  preferences.setCalendarSidebarVisibility('google:work:primary', true)
   preferences.setCalendarVisibility('google:work:primary', false)
 
   assert.equal(preferences.get().calendarColors['google:work:primary'], '#3858e9')
+  assert.equal(preferences.get().calendarSidebarVisibility['google:work:primary'], true)
   assert.equal(preferences.get().calendarVisibility['google:work:primary'], false)
+
+  preferences.setCalendarSidebarVisibility('google:work:primary', false)
+  assert.equal(preferences.get().calendarSidebarVisibility['google:work:primary'], false)
 
   preferences.setCalendarVisibility('google:work:primary', true)
   assert.equal(preferences.get().calendarVisibility['google:work:primary'], true)
+})
+
+test('quick calendar visibility changes keep the calendar in the sidebar', () => {
+  const preferences = createCalendarPreferencesStore(memoryStore())
+
+  preferences.setCalendarVisibility('google:work:primary', false)
+
+  assert.equal(preferences.get().calendarSidebarVisibility['google:work:primary'], true)
+  assert.equal(preferences.get().calendarVisibility['google:work:primary'], false)
 })
 
 test('hides and restores one occurrence or an entire series', () => {
