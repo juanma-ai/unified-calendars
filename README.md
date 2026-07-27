@@ -4,6 +4,8 @@ A personal Electron app that merges Google Calendar, Trello cards with due dates
 and Apple Reminders into one weekly view. Its interface uses the WordPress design
 system and `@wordpress/components`.
 
+![](./assets/snapshot.png)
+
 ## Using the calendar
 
 - The week starts on Monday and the current day is highlighted.
