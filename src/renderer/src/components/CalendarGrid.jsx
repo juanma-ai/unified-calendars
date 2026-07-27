@@ -1,9 +1,9 @@
 import { Button } from '@wordpress/components'
 import { addWeeks, format, isSameDay, isToday, subWeeks } from 'date-fns'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
 import { formatWeekRange, getMondayWeek } from '../calendarDates.js'
-import { buildDayLayout, HOUR_HEIGHT } from '../calendarTimeGrid.js'
+import { buildDayLayout, getCenteredTimeScrollTop, HOUR_HEIGHT } from '../calendarTimeGrid.js'
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 const CURRENT_TIME_REFRESH_MS = 5 * 60 * 1000
@@ -19,13 +19,15 @@ export function CalendarGrid({ events, onHideEvent, onNavigateWeek, preferences,
   const timeScrollRef = useRef(null)
   const [now, setNow] = useState(() => new Date())
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (todayRef.current) {
       todayRef.current.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' })
     } else if (viewportRef.current) {
       viewportRef.current.scrollLeft = 0
     }
-    if (timeScrollRef.current) timeScrollRef.current.scrollTop = 7 * HOUR_HEIGHT
+    if (timeScrollRef.current) {
+      timeScrollRef.current.scrollTop = getCenteredTimeScrollTop(new Date(), timeScrollRef.current.clientHeight)
+    }
   }, [weekStart])
 
   useEffect(() => {

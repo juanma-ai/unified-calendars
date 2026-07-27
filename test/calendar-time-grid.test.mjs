@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildDayLayout } from '../src/renderer/src/calendarTimeGrid.js'
+import {
+  buildDayLayout,
+  getCenteredTimeScrollTop,
+  HOUR_HEIGHT
+} from '../src/renderer/src/calendarTimeGrid.js'
 
 const day = new Date('2026-07-20T12:00:00+02:00')
 
@@ -63,5 +67,23 @@ test('places overlapping events into separate columns', () => {
       { column: 0, columnCount: 2 },
       { column: 1, columnCount: 2 }
     ]
+  )
+})
+
+test('centers the current time in the visible time grid', () => {
+  assert.equal(
+    getCenteredTimeScrollTop(new Date('2026-07-20T12:00:00+02:00'), 6 * HOUR_HEIGHT),
+    9 * HOUR_HEIGHT
+  )
+})
+
+test('clamps current time scroll near day boundaries', () => {
+  assert.equal(
+    getCenteredTimeScrollTop(new Date('2026-07-20T01:00:00+02:00'), 6 * HOUR_HEIGHT),
+    0
+  )
+  assert.equal(
+    getCenteredTimeScrollTop(new Date('2026-07-20T23:30:00+02:00'), 6 * HOUR_HEIGHT),
+    18 * HOUR_HEIGHT
   )
 })
