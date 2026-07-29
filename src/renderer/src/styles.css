@@ -511,6 +511,44 @@ input {
   padding: 1px 3px;
 }
 
+.calendar-grid.is-dragging {
+  user-select: none;
+}
+
+.calendar-week__timed-event.is-editable .components-button.event-pill,
+.calendar-week__all-day-event.is-editable .components-button.event-pill {
+  cursor: grab;
+}
+
+.calendar-week__timed-event.is-dragging,
+.calendar-week__all-day-event.is-dragging {
+  z-index: 3;
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
+}
+
+.calendar-week__timed-event.is-dragging .components-button.event-pill,
+.calendar-week__all-day-event.is-dragging .components-button.event-pill {
+  cursor: grabbing;
+}
+
+.calendar-week__resize-handle {
+  position: absolute;
+  z-index: 2;
+  right: 3px;
+  left: 3px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.calendar-week__resize-handle.is-start {
+  top: 0;
+}
+
+.calendar-week__resize-handle.is-end {
+  bottom: 0;
+}
+
 .components-button.event-pill {
   display: block;
   width: 100%;

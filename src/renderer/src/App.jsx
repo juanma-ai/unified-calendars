@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Notice } from '@wordpress/components'
 import { startOfWeek, endOfWeek } from 'date-fns'
 import { AppHeader } from './components/AppHeader.jsx'
 import { CalendarGrid } from './components/CalendarGrid.jsx'
@@ -17,6 +18,13 @@ const DEFAULT_PREFERENCES = {
 }
 const WEEK_OPTIONS = { weekStartsOn: 1 }
 
+// Electron wraps handler errors as "Error invoking remote method '…': Error: <message>".
+function getIpcErrorMessage(error) {
+  const message = error?.message ?? ''
+  const match = /Error:\s*(.*)$/.exec(message)
+  return (match?.[1] || message || 'Something went wrong').trim()
+}
+
 export function App() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), WEEK_OPTIONS))
   const [events, setEvents] = useState([])
@@ -28,6 +36,7 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [view, setView] = useState('calendar')
   const [settingsTab, setSettingsTab] = useState('connections')
+  const [actionError, setActionError] = useState(null)
 
   const openSettings = useCallback((tab = 'connections') => {
     setSettingsTab(tab)
@@ -91,12 +100,16 @@ export function App() {
 
   const handleReconnectGoogle = useCallback(
     (accountLabel) => {
+      setActionError(null)
       window.calendarAPI
         .startGoogleOAuth(accountLabel)
         .then(() => window.calendarAPI.getGoogleAccounts())
         .then(setGoogleAccounts)
         .then(refresh)
-        .catch((err) => console.error('Google OAuth failed:', err))
+        .catch((err) => {
+          console.error('Google OAuth failed:', err)
+          setActionError(getIpcErrorMessage(err))
+        })
     },
     [refresh]
   )
@@ -140,16 +153,60 @@ export function App() {
       .then(setPreferences)
   }, [])
 
+  // Google accounts connected before the app asked for write access stay read-only
+  // until they are reconnected from Settings.
+  const editableGoogleAccounts = useMemo(
+    () => new Set(googleAccounts.filter((account) => account.canEdit).map((account) => account.id)),
+    [googleAccounts]
+  )
+
+  const canEditEvent = useCallback(
+    (event) => {
+      // Events restored from the on-disk cache predate provider ids; a refresh fixes them.
+      if (!event.providerEventId) return false
+      if (event.source === 'google') return editableGoogleAccounts.has(event.sourceAccountId)
+      return event.source === 'trello' || event.source === 'reminders'
+    },
+    [editableGoogleAccounts]
+  )
+
+  const handleEventTimeChange = useCallback(
+    async (event, times) => {
+      const previous = { start: event.start, end: event.end }
+      const applyTimes = (values) =>
+        setEvents((current) =>
+          current.map((item) => (item.id === event.id ? { ...item, ...values } : item))
+        )
+
+      applyTimes({ start: times.start, end: times.end })
+      setActionError(null)
+
+      try {
+        await window.calendarAPI.updateEventTime({ event, start: times.start, end: times.end })
+        await refresh()
+      } catch (error) {
+        applyTimes(previous)
+        setActionError(getIpcErrorMessage(error))
+      }
+    },
+    [refresh]
+  )
+
   const handleRestoreHiddenEvent = useCallback((key) => {
     window.calendarAPI.restoreHiddenEvent(key).then(setPreferences)
   }, [])
 
   const handleConnectGoogle = useCallback(() => {
+    setActionError(null)
     return window.calendarAPI
       .connectGoogleAccount()
       .then(() => window.calendarAPI.getGoogleAccounts())
       .then(setGoogleAccounts)
       .then(refresh)
+      .catch((err) => {
+        console.error('Google OAuth failed:', err)
+        setActionError(getIpcErrorMessage(err))
+      })
   }, [refresh])
 
   const handleDisconnectGoogle = useCallback((accountId) => {
@@ -162,6 +219,11 @@ export function App() {
   if (view === 'settings') {
     return (
       <div className="app-shell">
+        {actionError && (
+          <Notice status="error" onRemove={() => setActionError(null)}>
+            {actionError}
+          </Notice>
+        )}
         <SettingsScreen
           calendars={calendars}
           googleAccounts={googleAccounts}
@@ -201,9 +263,16 @@ export function App() {
           statuses={statuses}
         />
         <main className="calendar-main">
+          {actionError && (
+            <Notice status="error" onRemove={() => setActionError(null)}>
+              {actionError}
+            </Notice>
+          )}
           <CalendarGrid
             weekStart={weekStart}
+            canEditEvent={canEditEvent}
             events={visibleEvents}
+            onEventTimeChange={handleEventTimeChange}
             onHideEvent={handleHideEvent}
             preferences={preferences}
           />

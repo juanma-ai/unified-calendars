@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   getSourceStatus: () => ipcRenderer.invoke('calendar:getSourceStatus'),
   getAvailableCalendars: () => ipcRenderer.invoke('calendar:getAvailableCalendars'),
   refreshNow: (rangeStart, rangeEnd) => ipcRenderer.invoke('calendar:refreshNow', rangeStart, rangeEnd),
+  updateEventTime: (payload) => ipcRenderer.invoke('calendar:updateEventTime', payload),
   startGoogleOAuth: (accountLabel) => ipcRenderer.invoke('calendar:startGoogleOAuth', accountLabel),
   getGoogleAccounts: () => ipcRenderer.invoke('accounts:getGoogle'),
   connectGoogleAccount: () => ipcRenderer.invoke('accounts:connectGoogle'),

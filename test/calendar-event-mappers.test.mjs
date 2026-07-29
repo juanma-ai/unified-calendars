@@ -22,6 +22,8 @@ test('Google events retain calendar and recurring-series identity', () => {
   assert.equal(event.calendarDefaultColor, '#3858e9')
   assert.equal(event.calendarDefaultVisible, true)
   assert.equal(event.seriesId, 'google:work:team@example.com:series:weekly-team-meeting')
+  assert.equal(event.providerCalendarId, 'team@example.com', 'writes target the raw calendar id')
+  assert.equal(event.providerEventId, 'instance-20260721', 'patches target this occurrence')
 })
 
 test('Trello cards retain their board identity', () => {
@@ -40,6 +42,8 @@ test('Trello cards retain their board identity', () => {
   assert.equal(event.calendarName, 'Editorial board')
   assert.equal(event.calendarDefaultVisible, false)
   assert.equal(event.seriesId, null)
+  assert.equal(event.providerCalendarId, 'board-1')
+  assert.equal(event.providerEventId, 'card-1')
 })
 
 test('Trello cards include assignee metadata and assigned-to-me state', () => {

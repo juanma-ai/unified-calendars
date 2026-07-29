@@ -21,3 +21,7 @@
 - Trello cards not assigned to the current user should be visually de-emphasized enough to be obvious at calendar-grid density; a 30% lighter background is too subtle, so use a stronger distinction such as 60% lightening.
 - Menu-bar/tray agenda features must expose a visible macOS status-bar title, not only a tiny icon or tooltip, so `npm start` and packaged builds are easy to discover.
 - When a menu-bar/tray agenda is expected to follow native Mac menu behavior, use Electron's native `Menu`/`MenuItem` instead of a custom floating `BrowserWindow` popover unless custom rendering is explicitly more important than native dismissal, typography, spacing, and menu interaction.
+- Google Calendar write access is a separate OAuth grant: accounts connected before the `calendar.events` scope existed stay read-only until reconnected, so gate editing on the per-account `canEdit` flag rather than assuming a connected account can be edited.
+- Trello cards and Reminders are points in time, not intervals; they can be moved but never resized, and `eventMutations.js` rejects a duration change for those sources.
+- Never re-parse composite event ids (`google:<account>:<calendar>:<event>`) to address a provider; use the `providerCalendarId`/`providerEventId` fields the mappers emit.
+

@@ -7,7 +7,9 @@ import {
   invalidateSourceCache
 } from './aggregator.js'
 import { config } from './config.js'
-import { disconnectGoogleAccount, startOAuthFlow } from './sources/google.js'
+import { disconnectGoogleAccount, startOAuthFlow, updateGoogleEventTime } from './sources/google.js'
+import { updateReminderDue } from './sources/reminders.js'
+import { updateTrelloCardDue } from './sources/trello.js'
 import { getGoogleAccounts } from './tokenStore.js'
 import {
   getCalendarPreferences,
@@ -18,6 +20,16 @@ import {
   setCalendarVisibility
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
+import { createEventTimeUpdater } from './eventMutations.js'
+
+const updateEventTime = createEventTimeUpdater(
+  {
+    google: updateGoogleEventTime,
+    trello: updateTrelloCardDue,
+    reminders: updateReminderDue
+  },
+  invalidateSourceCache
+)
 
 let activeBounceId = null
 
@@ -93,6 +105,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('calendar:refreshNow', async (_event, rangeStart, rangeEnd) => {
     const events = await getUnifiedEvents(rangeStart, rangeEnd, { force: true })
     return scheduleEventNotifications(events)
+  })
+
+  ipcMain.handle('calendar:updateEventTime', (_event, payload) => {
+    return updateEventTime(payload ?? {})
   })
 
   ipcMain.handle('calendar:startGoogleOAuth', (_event, accountLabel) => {

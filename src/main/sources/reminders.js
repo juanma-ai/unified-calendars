@@ -13,7 +13,7 @@ const HELPER_PATH = isPackaged
       'native/reminders-helper/.build/release/RemindersHelper.app/Contents/MacOS/RemindersHelper'
     )
 
-async function runHelper(rangeStart, rangeEnd) {
+async function runHelper(args) {
   try {
     await access(HELPER_PATH)
   } catch {
@@ -23,7 +23,7 @@ async function runHelper(rangeStart, rangeEnd) {
   }
 
   return new Promise((resolve, reject) => {
-    const child = spawn(HELPER_PATH, ['--start', rangeStart, '--end', rangeEnd])
+    const child = spawn(HELPER_PATH, args)
     let stdout = ''
     let stderr = ''
 
@@ -53,6 +53,8 @@ function mapReminder(item) {
     calendarDefaultColor: '#9b7a00',
     calendarDefaultVisible: true,
     id: `reminders:${item.id}`,
+    providerCalendarId: item.listName,
+    providerEventId: item.id,
     seriesId: null,
     title: item.title,
     start: item.dueDate,
@@ -67,9 +69,15 @@ export function filterIncompleteReminderItems(items) {
   return items.filter((item) => !item.isCompleted)
 }
 
+// A reminder is a due date, not an interval, so only its start is written back.
+export async function updateReminderDue(event, { start }) {
+  const item = await runHelper(['--set-due', event.providerEventId, '--due', start])
+  return mapReminder(item)
+}
+
 export async function fetchRemindersEvents(rangeStart, rangeEnd) {
   try {
-    const items = await runHelper(rangeStart, rangeEnd)
+    const items = await runHelper(['--start', rangeStart, '--end', rangeEnd])
     return {
       events: filterIncompleteReminderItems(items).map(mapReminder),
       statuses: [{ source: 'reminders', ok: true, lastSyncedAt: new Date().toISOString() }]

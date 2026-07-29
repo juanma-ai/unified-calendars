@@ -34,6 +34,37 @@ async function fetchBoardCards(board) {
   return { board, cards: await cardsRes.json(), members: await membersRes.json() }
 }
 
+// A Trello card is a due date, not an interval, so only its start is written back.
+export async function updateTrelloCardDue(event, { start }) {
+  if (!config.trello.apiKey || !config.trello.token) throw new Error('Trello is not connected')
+
+  const due = new Date(start).toISOString()
+  const res = await fetch(
+    `${BASE_URL}/cards/${event.providerEventId}?due=${encodeURIComponent(due)}&${authQuery()}`,
+    { method: 'PUT' }
+  )
+
+  if (!res.ok) {
+    // Trello explains refusals in the body ("unauthorized card permission requested"),
+    // which is the difference between a read-only token and a board permission problem.
+    const detail = (await res.text().catch(() => '')).trim()
+    if (res.status === 401) {
+      throw new Error(
+        `Trello rejected the edit${detail ? ` (${detail})` : ''}. Regenerate TRELLO_TOKEN with scope=read,write.`
+      )
+    }
+    throw new Error(`Trello card update failed: ${res.status}${detail ? ` — ${detail}` : ''}`)
+  }
+
+  const card = await res.json()
+  return {
+    ...event,
+    start: card.due ?? due,
+    end: card.due ?? due,
+    raw: card
+  }
+}
+
 export function filterIncompleteTrelloCards(cards) {
   return cards.filter((card) => !card.dueComplete)
 }
