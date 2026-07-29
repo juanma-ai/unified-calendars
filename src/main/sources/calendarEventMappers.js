@@ -10,6 +10,10 @@ export function mapGoogleEvent(item, accountLabel, calendar) {
     calendarDefaultColor: calendar.backgroundColor ?? '#3858e9',
     calendarDefaultVisible: Boolean(calendar.primary),
     id: `${calendarId}:${item.id}`,
+    // Composite ids can't be split back apart reliably (a Google calendar id is an
+    // email and the app-level id joins on ':'), so keep the provider ids for writes.
+    providerCalendarId: calendar.id,
+    providerEventId: item.id,
     seriesId: item.recurringEventId
       ? `${calendarId}:series:${item.recurringEventId}`
       : null,
@@ -50,6 +54,8 @@ export function mapTrelloCard(card, board, options = {}) {
     calendarDefaultColor: '#9b7a00',
     calendarDefaultVisible: false,
     id: `trello:${card.id}`,
+    providerCalendarId: board.id,
+    providerEventId: card.id,
     seriesId: null,
     title: card.name,
     start: card.due,

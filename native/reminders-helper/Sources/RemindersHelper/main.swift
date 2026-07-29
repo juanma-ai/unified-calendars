@@ -6,17 +6,30 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-func parseArgs() -> (start: Date, end: Date, output: URL?) {
+enum Command {
+    case fetch(start: Date, end: Date)
+    case setDue(id: String, due: Date)
+}
+
+func parseArgs() -> (command: Command, output: URL?) {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let fallbackFormatter = ISO8601DateFormatter()
+    // All-day items travel as plain calendar dates; they mean local midnight.
+    let dateOnlyFormatter = ISO8601DateFormatter()
+    dateOnlyFormatter.formatOptions = [.withFullDate]
+    dateOnlyFormatter.timeZone = TimeZone.current
 
     func parseDate(_ value: String) -> Date? {
-        formatter.date(from: value) ?? fallbackFormatter.date(from: value)
+        formatter.date(from: value)
+            ?? fallbackFormatter.date(from: value)
+            ?? dateOnlyFormatter.date(from: value)
     }
 
     var start: Date?
     var end: Date?
+    var setDueId: String?
+    var due: Date?
     var output: URL?
     var iterator = CommandLine.arguments.dropFirst().makeIterator()
 
@@ -32,6 +45,16 @@ func parseArgs() -> (start: Date, end: Date, output: URL?) {
                 fail("--end requires a valid ISO 8601 value")
             }
             end = date
+        case "--set-due":
+            guard let value = iterator.next(), !value.isEmpty else {
+                fail("--set-due requires a reminder identifier")
+            }
+            setDueId = value
+        case "--due":
+            guard let value = iterator.next(), let date = parseDate(value) else {
+                fail("--due requires a valid ISO 8601 value")
+            }
+            due = date
         case "--output":
             guard let value = iterator.next(), !value.isEmpty else {
                 fail("--output requires a file path")
@@ -42,10 +65,16 @@ func parseArgs() -> (start: Date, end: Date, output: URL?) {
         }
     }
 
-    guard let s = start, let e = end else {
-        fail("Usage: reminders-helper --start <ISO8601> --end <ISO8601>")
+    if let setDueId {
+        guard let due else { fail("--set-due requires --due <ISO8601>") }
+        return (.setDue(id: setDueId, due: due), output)
     }
-    return (s, e, output)
+
+    guard let start, let end else {
+        fail("Usage: reminders-helper --start <ISO8601> --end <ISO8601>"
+            + " | --set-due <id> --due <ISO8601>")
+    }
+    return (.fetch(start: start, end: end), output)
 }
 
 struct ReminderOut: Codable {
@@ -58,7 +87,32 @@ struct ReminderOut: Codable {
     let notes: String?
 }
 
-let (rangeStart, rangeEnd, outputURL) = parseArgs()
+func makeReminderOut(_ reminder: EKReminder, components: DateComponents, date: Date) -> ReminderOut {
+    ReminderOut(
+        id: reminder.calendarItemIdentifier,
+        title: reminder.title ?? "(no title)",
+        dueDate: ISO8601DateFormatter().string(from: date),
+        allDay: components.hour == nil,
+        isCompleted: reminder.isCompleted,
+        listName: reminder.calendar.title,
+        notes: reminder.notes
+    )
+}
+
+func writeOutput<T: Encodable>(_ value: T, to outputURL: URL?) {
+    do {
+        let data = try JSONEncoder().encode(value)
+        if let outputURL {
+            try data.write(to: outputURL, options: .atomic)
+        } else {
+            FileHandle.standardOutput.write(data)
+        }
+    } catch {
+        fail("json-encode-error: \(error.localizedDescription)")
+    }
+}
+
+let (command, outputURL) = parseArgs()
 let store = EKEventStore()
 
 let accessSemaphore = DispatchSemaphore(value: 0)
@@ -85,43 +139,54 @@ if !accessGranted {
     fail("permission-denied: \(message)")
 }
 
-let calendars = store.calendars(for: .reminder)
-let predicate = store.predicateForReminders(in: calendars)
+switch command {
+case let .fetch(rangeStart, rangeEnd):
+    let calendars = store.calendars(for: .reminder)
+    let predicate = store.predicateForReminders(in: calendars)
 
-let fetchSemaphore = DispatchSemaphore(value: 0)
-var results: [ReminderOut] = []
+    let fetchSemaphore = DispatchSemaphore(value: 0)
+    var results: [ReminderOut] = []
 
-store.fetchReminders(matching: predicate) { reminders in
-    defer { fetchSemaphore.signal() }
-    guard let reminders = reminders else { return }
+    store.fetchReminders(matching: predicate) { reminders in
+        defer { fetchSemaphore.signal() }
+        guard let reminders = reminders else { return }
 
-    let outputFormatter = ISO8601DateFormatter()
+        for reminder in reminders {
+            guard let components = reminder.dueDateComponents,
+                  let date = Calendar.current.date(from: components) else { continue }
+            guard date >= rangeStart && date <= rangeEnd else { continue }
 
-    for reminder in reminders {
-        guard let components = reminder.dueDateComponents,
-              let date = Calendar.current.date(from: components) else { continue }
-        guard date >= rangeStart && date <= rangeEnd else { continue }
-
-        results.append(ReminderOut(
-            id: reminder.calendarItemIdentifier,
-            title: reminder.title ?? "(no title)",
-            dueDate: outputFormatter.string(from: date),
-            allDay: components.hour == nil,
-            isCompleted: reminder.isCompleted,
-            listName: reminder.calendar.title,
-            notes: reminder.notes
-        ))
+            results.append(makeReminderOut(reminder, components: components, date: date))
+        }
     }
-}
-fetchSemaphore.wait()
+    fetchSemaphore.wait()
 
-do {
-    let data = try JSONEncoder().encode(results)
-    if let outputURL {
-        try data.write(to: outputURL, options: .atomic)
-    } else {
-        FileHandle.standardOutput.write(data)
+    writeOutput(results, to: outputURL)
+
+case let .setDue(id, due):
+    guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
+        fail("not-found: no reminder with identifier \(id)")
     }
-} catch {
-    fail("json-encode-error: \(error.localizedDescription)")
+
+    // A reminder with no hour component is an all-day item; keep it that way so
+    // moving it between days doesn't silently give it a time.
+    let isAllDay = reminder.dueDateComponents?.hour == nil
+    let fields: Set<Calendar.Component> = isAllDay
+        ? [.year, .month, .day]
+        : [.year, .month, .day, .hour, .minute, .second]
+    let components = Calendar.current.dateComponents(fields, from: due)
+    reminder.dueDateComponents = components
+
+    do {
+        try store.save(reminder, commit: true)
+    } catch {
+        fail("save-failed: \(error.localizedDescription)")
+    }
+
+    guard let saved = reminder.dueDateComponents,
+          let savedDate = Calendar.current.date(from: saved) else {
+        fail("save-failed: reminder has no due date after saving")
+    }
+
+    writeOutput(makeReminderOut(reminder, components: saved, date: savedDate), to: outputURL)
 }

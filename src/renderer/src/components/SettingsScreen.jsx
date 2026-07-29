@@ -52,16 +52,26 @@ function GoogleConnectionCard({ accounts, onConnect, onDisconnect, onReconnect, 
                     <strong>{account.label}</strong>
                     {account.email && account.email !== account.label && <p>{account.email}</p>}
                     {status && !status.ok && <p>{status.lastError ?? 'Connection failed'}</p>}
+                    {status?.ok && !account.canEdit && (
+                      <p>Read-only access. Reconnect to move and resize events from the calendar.</p>
+                    )}
                   </FlexBlock>
                   <FlexItem>
                     {status?.ok ? (
-                      <Button
-                        variant="secondary"
-                        isDestructive
-                        onClick={() => onDisconnect(account.id)}
-                      >
-                        {account.legacy ? 'Disconnect' : 'Remove'}
-                      </Button>
+                      <Flex gap={2} justify="flex-end">
+                        {!account.canEdit && (
+                          <Button variant="secondary" onClick={() => onReconnect(account.id)}>
+                            Reconnect to enable editing
+                          </Button>
+                        )}
+                        <Button
+                          variant="secondary"
+                          isDestructive
+                          onClick={() => onDisconnect(account.id)}
+                        >
+                          {account.legacy ? 'Disconnect' : 'Remove'}
+                        </Button>
+                      </Flex>
                     ) : (
                       <Button variant="secondary" onClick={() => onReconnect(account.id)}>
                         Connect

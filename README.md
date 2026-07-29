@@ -86,8 +86,11 @@ Tokens are stored locally via `electron-store` (in the Electron app's user data 
 1. Get an API key at https://trello.com/power-ups/admin.
 2. Generate a token by visiting (replace `YOUR_KEY`):
    ```
-   https://trello.com/1/authorize?expiration=never&scope=read&response_type=token&key=YOUR_KEY
+   https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&key=YOUR_KEY
    ```
+   `write` is what lets you drag a card to a new due date in the calendar. A
+   token generated with `scope=read` still shows cards, but moving one fails with
+   "Trello rejected the edit"; regenerate the token to fix it.
 3. Add both to `.env`:
    ```
    TRELLO_API_KEY=...

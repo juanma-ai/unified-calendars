@@ -13,7 +13,10 @@ import {
 } from '../tokenStore.js'
 import { mapGoogleEvent } from './calendarEventMappers.js'
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.events'
+]
 
 // Authenticated OAuth2Client per account label, kept in memory once loaded/authorized.
 const clients = new Map()
@@ -214,6 +217,57 @@ export async function fetchGoogleEvents(rangeStart, rangeEnd) {
   }
 
   return { events, calendars: sourceCalendars, statuses }
+}
+
+// All-day boundaries are plain calendar dates; the renderer shifts them at UTC
+// midnight, so the UTC date part is the value Google expects back.
+function toAllDayDate(value) {
+  return new Date(value).toISOString().slice(0, 10)
+}
+
+function toGoogleTimes(event, { start, end }) {
+  if (event.allDay) {
+    return { start: { date: toAllDayDate(start) }, end: { date: toAllDayDate(end) } }
+  }
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return {
+    start: { dateTime: new Date(start).toISOString(), timeZone },
+    end: { dateTime: new Date(end).toISOString(), timeZone }
+  }
+}
+
+export async function updateGoogleEventTime(event, times) {
+  const client = await getAuthClient(event.sourceAccountId)
+  if (!client) throw new Error('Google account is not connected')
+
+  const calendar = google.calendar({ version: 'v3', auth: client })
+
+  let response
+  try {
+    response = await calendar.events.patch({
+      calendarId: event.providerCalendarId,
+      eventId: event.providerEventId,
+      requestBody: toGoogleTimes(event, times)
+    })
+  } catch (error) {
+    const status = error?.response?.status ?? error?.code
+    if (status === 401 || status === 403) {
+      throw new Error(
+        'Google denied the edit. Reconnect this account in Settings to grant calendar editing.'
+      )
+    }
+    throw error
+  }
+
+  // The patch response is a bare event resource, so rebuild the calendar fields
+  // this event already carries rather than refetching the calendar list.
+  return mapGoogleEvent(response.data, event.sourceAccountId, {
+    id: event.providerCalendarId,
+    summary: event.calendarName,
+    backgroundColor: event.calendarDefaultColor,
+    primary: event.calendarDefaultVisible
+  })
 }
 
 export function disconnectGoogleAccount(accountId) {
