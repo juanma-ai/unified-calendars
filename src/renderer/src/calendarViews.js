@@ -32,9 +32,20 @@ export function isCalendarView(value) {
   return VIEWS.includes(value)
 }
 
-// Month and agenda both work off whole calendar weeks so the month grid has no
-// ragged first and last rows, and so the agenda covers everything the month grid
-// can show.
+// The agenda is a forward-looking list rather than a grid, so it runs from the
+// anchor day itself instead of snapping back to a month or week boundary. With
+// the anchor on today that puts today first, which is the whole point of it.
+export const AGENDA_DAYS = 30
+
+function agendaRange(anchor) {
+  return {
+    start: startOfDay(anchor),
+    end: endOfDay(addDays(anchor, AGENDA_DAYS - 1))
+  }
+}
+
+// The month grid works off whole calendar weeks so it has no ragged first and
+// last rows.
 function monthGridRange(anchor) {
   return {
     start: startOfWeek(startOfMonth(anchor), WEEK_OPTIONS),
@@ -42,12 +53,17 @@ function monthGridRange(anchor) {
   }
 }
 
+function formatDayRange({ start, end }) {
+  return `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
+}
+
 export function getViewRange(view, anchor) {
   switch (view) {
     case 'day':
       return { start: startOfDay(anchor), end: endOfDay(anchor) }
-    case 'month':
     case 'agenda':
+      return agendaRange(anchor)
+    case 'month':
       return monthGridRange(anchor)
     case 'year':
       return { start: startOfYear(anchor), end: endOfYear(anchor) }
@@ -60,7 +76,7 @@ export function getViewRange(view, anchor) {
 export function getViewDays(view, anchor) {
   if (view === 'day') return [startOfDay(anchor)]
 
-  const { start, end } = getViewRange(view === 'agenda' ? 'month' : view, anchor)
+  const { start, end } = getViewRange(view, anchor)
   return eachDayOfInterval({ start, end })
 }
 
@@ -68,8 +84,9 @@ export function formatViewLabel(view, anchor) {
   switch (view) {
     case 'day':
       return format(anchor, 'EEE, MMM d, yyyy')
-    case 'month':
     case 'agenda':
+      return formatDayRange(agendaRange(anchor))
+    case 'month':
       return format(anchor, 'MMMM yyyy')
     case 'year':
       return format(anchor, 'yyyy')
@@ -85,8 +102,9 @@ export function navigateView(view, anchor, direction) {
   switch (view) {
     case 'day':
       return addDays(anchor, direction)
-    case 'month':
     case 'agenda':
+      return addDays(anchor, direction * AGENDA_DAYS)
+    case 'month':
       return addMonths(anchor, direction)
     case 'year':
       return addYears(anchor, direction)

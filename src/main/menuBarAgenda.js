@@ -217,7 +217,8 @@ export function createMenuBarAgenda({
   createWindow,
   getCalendarPreferences,
   getMainWindow,
-  getUnifiedEvents
+  getUnifiedEvents,
+  onEventsRefreshed = () => {}
 }) {
   let tray
   let refreshTimer
@@ -226,6 +227,9 @@ export function createMenuBarAgenda({
   async function loadAgenda({ force = false } = {}) {
     const range = getTodayRange()
     const events = await getUnifiedEvents(range.rangeStart, range.rangeEnd, { force })
+    // This range already rolls with the day on a short interval, so it doubles
+    // as the feed for event notifications.
+    onEventsRefreshed(events)
     return buildAgenda(events, { preferences: getCalendarPreferences() })
   }
 
