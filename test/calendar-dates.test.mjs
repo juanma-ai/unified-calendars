@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { startOfWeek } from 'date-fns'
 
-import { formatWeekRange, getMondayWeek } from '../src/renderer/src/calendarDates.js'
+import { formatWeekRange, WEEK_OPTIONS } from '../src/renderer/src/calendarDates.js'
 
-test('builds Monday-first weeks and the PDF range label', () => {
-  const { start, days } = getMondayWeek(new Date('2026-07-22T12:00:00+02:00'))
+test('labels a Monday-first week range', () => {
+  const start = startOfWeek(new Date('2026-07-22T12:00:00+02:00'), WEEK_OPTIONS)
 
   assert.equal(start.getDay(), 1)
-  assert.equal(days.length, 7)
   assert.equal(formatWeekRange(start), 'Jul 20 – Jul 26, 2026')
 })

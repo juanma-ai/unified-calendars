@@ -48,12 +48,26 @@ function lightenHexColor(color, amount = 0.6) {
   return `#${lightened}`
 }
 
-export function EventPill({ event, onHideEvent, preferences, showTime = false }) {
+/**
+ * `variant` picks how the event reads in the surrounding layout: `pill` is the
+ * coloured block used in the grids, `row` is the flat list line used by the
+ * agenda, where the colour moves into a swatch so the title stays plain text.
+ */
+export function EventPill({
+  event,
+  onHideEvent,
+  preferences,
+  showTime = false,
+  variant = 'pill'
+}) {
   const color = getEventColor(event, preferences)
   const assignmentKnown = event.source === 'trello' && Array.isArray(event.assignees)
   const displayColor = assignmentKnown && !event.assignedToMe ? lightenHexColor(color) : color
   const palette = getEventPalette(displayColor)
-  const time = showTime ? format(new Date(event.start), 'HH:mm') : null
+  const isRow = variant === 'row'
+  // An all-day event has no meaningful clock time — showing one would print the
+  // midnight boundary the source happened to use.
+  const time = showTime && !event.allDay ? format(new Date(event.start), 'HH:mm') : null
   const trelloAssigneeLabel = getTrelloAssigneeLabel(event)
   const trelloDueLabel = event.source === 'trello' ? format(new Date(event.start), 'MMM d, HH:mm') : null
   const trelloMetaLabel = trelloAssigneeLabel
@@ -72,14 +86,21 @@ export function EventPill({ event, onHideEvent, preferences, showTime = false })
       popoverProps={{ placement: 'right-start' }}
       renderToggle={({ onToggle }) => (
         <Button
-          className={`event-pill${showTime ? ' is-timed' : ''}${
+          className={`event-pill${isRow ? ' is-row' : ''}${showTime && !isRow ? ' is-timed' : ''}${
             event.assignedToMe ? ' is-assigned-to-me' : ''
           }`}
           aria-label={actionLabel}
           onClick={onToggle}
-          style={{ backgroundColor: palette.background, color: palette.text }}
+          style={isRow ? undefined : { backgroundColor: palette.background, color: palette.text }}
         >
-          {time && <span className="event-pill__time">{time}</span>}
+          {isRow && (
+            <span
+              className="event-pill__swatch"
+              style={{ backgroundColor: displayColor }}
+              aria-hidden="true"
+            />
+          )}
+          {time && !isRow && <span className="event-pill__time">{time}</span>}
           <span className="event-pill__title">{event.title}</span>
           {trelloMetaLabel && <span className="event-pill__meta">{trelloMetaLabel}</span>}
         </Button>

@@ -1,7 +1,7 @@
 import { differenceInMinutes, format, isSameDay, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
-import { formatWeekRange, getMondayWeek } from '../calendarDates.js'
+import { formatViewLabel, getViewDays } from '../calendarViews.js'
 import {
   buildDayLayout,
   getCenteredTimeScrollTop,
@@ -51,14 +51,15 @@ function getPreviewGeometry(times) {
 }
 
 export function CalendarGrid({
+  anchorDate,
+  calendarView,
   canEditEvent = () => false,
   events,
   onEventTimeChange,
   onHideEvent,
-  preferences,
-  weekStart
+  preferences
 }) {
-  const { days } = getMondayWeek(weekStart)
+  const days = getViewDays(calendarView, anchorDate)
   const viewportRef = useRef(null)
   const todayRef = useRef(null)
   const timeScrollRef = useRef(null)
@@ -78,7 +79,7 @@ export function CalendarGrid({
     if (timeScrollRef.current) {
       timeScrollRef.current.scrollTop = getCenteredTimeScrollTop(new Date(), timeScrollRef.current.clientHeight)
     }
-  }, [weekStart])
+  }, [anchorDate, calendarView])
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), CURRENT_TIME_REFRESH_MS)
@@ -224,16 +225,16 @@ export function CalendarGrid({
     const dayEvents = events.filter((event) => isSameDay(new Date(event.start), day))
     return buildDayLayout(dayEvents, day)
   })
-  const weekContainsToday = days.some((day) => isToday(day))
+  const rangeContainsToday = days.some((day) => isToday(day))
   const currentTimeTop = (getCurrentMinutes(now) / 60) * HOUR_HEIGHT
 
   return (
     <section
       className={`calendar-grid${drag ? ' is-dragging' : ''}`}
-      aria-label={formatWeekRange(weekStart)}
+      aria-label={formatViewLabel(calendarView, anchorDate)}
     >
       <div className="calendar-grid-viewport" ref={viewportRef}>
-        <div className="calendar-week">
+        <div className="calendar-week" style={{ '--calendar-day-count': days.length }}>
           <div className="calendar-week__day-headers">
             <div className="calendar-week__corner">
               <span className="calendar-week__timezone">{formatTimezoneOffset(now)}</span>
@@ -365,7 +366,7 @@ export function CalendarGrid({
                   </div>
                 )
               })}
-              {weekContainsToday && (
+              {rangeContainsToday && (
                 <div
                   className="calendar-week__current-time"
                   style={{ top: currentTimeTop }}

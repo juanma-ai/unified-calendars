@@ -1,8 +1,21 @@
-import { Button, ButtonGroup, Spinner } from '@wordpress/components'
-import { addWeeks, subWeeks } from 'date-fns'
-import { formatWeekRange, getMondayWeek } from '../calendarDates.js'
+import {
+  Button,
+  ButtonGroup,
+  Spinner,
+  __experimentalToggleGroupControl as ToggleGroupControl,
+  __experimentalToggleGroupControlOption as ToggleGroupControlOption
+} from '@wordpress/components'
+import { formatViewLabel, navigateView, VIEW_LABELS, VIEWS } from '../calendarViews.js'
 
-export function AppHeader({ onNavigateWeek, onOpenSettings, onRefresh, refreshing, weekStart }) {
+export function AppHeader({
+  anchorDate,
+  calendarView,
+  onNavigate,
+  onOpenSettings,
+  onRefresh,
+  onViewChange,
+  refreshing
+}) {
   return (
     <header className="app-header">
       <div className="app-header__brand">
@@ -14,23 +27,43 @@ export function AppHeader({ onNavigateWeek, onOpenSettings, onRefresh, refreshin
 
       <div className="app-header__navigation">
         <ButtonGroup className="app-header__week-nav">
-          <Button variant="secondary" onClick={() => onNavigateWeek(subWeeks(weekStart, 1))}>
+          <Button
+            variant="secondary"
+            onClick={() => onNavigate(navigateView(calendarView, anchorDate, -1))}
+          >
             Prev
           </Button>
           <Button
             variant="secondary"
-            onClick={() => onNavigateWeek(getMondayWeek(new Date()).start)}
+            onClick={() => onNavigate(navigateView(calendarView, anchorDate, 'today'))}
           >
             Today
           </Button>
-          <Button variant="secondary" onClick={() => onNavigateWeek(addWeeks(weekStart, 1))}>
+          <Button
+            variant="secondary"
+            onClick={() => onNavigate(navigateView(calendarView, anchorDate, 1))}
+          >
             Next
           </Button>
         </ButtonGroup>
-        <p className="app-header__range">{formatWeekRange(weekStart)}</p>
+        <p className="app-header__range">{formatViewLabel(calendarView, anchorDate)}</p>
       </div>
 
       <div className="app-header__actions">
+        <ToggleGroupControl
+          __next40pxDefaultSize
+          __nextHasNoMarginBottom
+          className="app-header__view-switcher"
+          hideLabelFromVision
+          isBlock
+          label="Calendar view"
+          onChange={onViewChange}
+          value={calendarView}
+        >
+          {VIEWS.map((view) => (
+            <ToggleGroupControlOption key={view} label={VIEW_LABELS[view]} value={view} />
+          ))}
+        </ToggleGroupControl>
         <Button variant="primary" onClick={onRefresh} disabled={refreshing}>
           {refreshing && <Spinner />}
           {refreshing ? 'Refreshing' : 'Refresh now'}

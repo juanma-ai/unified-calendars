@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Notice } from '@wordpress/components'
-import { startOfWeek, endOfWeek } from 'date-fns'
+import { AgendaView } from './components/AgendaView.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { CalendarGrid } from './components/CalendarGrid.jsx'
 import { CalendarSidebar } from './components/CalendarSidebar.jsx'
+import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
+import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents } from './calendarViewModel.js'
+import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
+const VIEW_STORAGE_KEY = 'calendarView'
 const DEFAULT_PREFERENCES = {
   calendarColors: {},
   calendarSidebarVisibility: {},
@@ -16,7 +20,10 @@ const DEFAULT_PREFERENCES = {
   hiddenCalendars: [],
   hiddenEvents: []
 }
-const WEEK_OPTIONS = { weekStartsOn: 1 }
+function readStoredView() {
+  const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
+  return isCalendarView(stored) ? stored : DEFAULT_VIEW
+}
 
 // Electron wraps handler errors as "Error invoking remote method '…': Error: <message>".
 function getIpcErrorMessage(error) {
@@ -26,7 +33,10 @@ function getIpcErrorMessage(error) {
 }
 
 export function App() {
-  const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), WEEK_OPTIONS))
+  const [calendarView, setCalendarView] = useState(readStoredView)
+  // The anchor is any date inside the range; each view snaps it to its own
+  // boundaries, so it stays a plain "the calendar is looking at this date".
+  const [anchorDate, setAnchorDate] = useState(() => new Date())
   const [events, setEvents] = useState([])
   const [availableCalendars, setAvailableCalendars] = useState([])
   const [googleAccounts, setGoogleAccounts] = useState([])
@@ -34,14 +44,32 @@ export function App() {
   const [refreshing, setRefreshing] = useState(false)
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [searchQuery, setSearchQuery] = useState('')
-  const [view, setView] = useState('calendar')
+  const [screen, setScreen] = useState('calendar')
   const [settingsTab, setSettingsTab] = useState('connections')
   const [actionError, setActionError] = useState(null)
 
   const openSettings = useCallback((tab = 'connections') => {
     setSettingsTab(tab)
-    setView('settings')
+    setScreen('settings')
   }, [])
+
+  const handleViewChange = useCallback((nextView) => {
+    if (!isCalendarView(nextView)) return
+    window.localStorage.setItem(VIEW_STORAGE_KEY, nextView)
+    setCalendarView(nextView)
+  }, [])
+
+  const openDay = useCallback((day) => {
+    setAnchorDate(day)
+    handleViewChange('day')
+  }, [handleViewChange])
+
+  // One source of truth for the fetch range, so navigation and Refresh now can
+  // never ask the main process for different windows of time.
+  const range = useMemo(() => {
+    const { start, end } = getViewRange(calendarView, anchorDate)
+    return { start: start.toISOString(), end: end.toISOString() }
+  }, [anchorDate, calendarView])
 
   const calendars = useMemo(
     () => buildCalendars(events, preferences, availableCalendars),
@@ -64,14 +92,11 @@ export function App() {
   )
 
   const refresh = useCallback(async () => {
-    const rangeStart = weekStart.toISOString()
-    const rangeEnd = endOfWeek(weekStart, WEEK_OPTIONS).toISOString()
-
-    const result = await refreshCalendar(window.calendarAPI, rangeStart, rangeEnd)
+    const result = await refreshCalendar(window.calendarAPI, range.start, range.end)
     setEvents(result.events)
     setStatuses(result.statuses)
     setAvailableCalendars(result.calendars)
-  }, [weekStart])
+  }, [range])
 
   // Paint instantly from whatever was cached on disk from the last run, then
   // kick off a live fetch for the current range in the background.
@@ -95,7 +120,7 @@ export function App() {
   }, [refresh])
 
   useEffect(() => {
-    return window.calendarAPI.onOpenSettings?.(() => setView('settings'))
+    return window.calendarAPI.onOpenSettings?.(() => setScreen('settings'))
   }, [])
 
   const handleReconnectGoogle = useCallback(
@@ -116,17 +141,15 @@ export function App() {
 
   const handleRefreshNow = useCallback(() => {
     setRefreshing(true)
-    const rangeStart = weekStart.toISOString()
-    const rangeEnd = endOfWeek(weekStart, WEEK_OPTIONS).toISOString()
 
-    refreshCalendar(window.calendarAPI, rangeStart, rangeEnd, { force: true })
+    refreshCalendar(window.calendarAPI, range.start, range.end, { force: true })
       .then((result) => {
         setEvents(result.events)
         setStatuses(result.statuses)
         setAvailableCalendars(result.calendars)
       })
       .finally(() => setRefreshing(false))
-  }, [weekStart])
+  }, [range])
 
   const handleCalendarColor = useCallback((calendarId, color) => {
     window.calendarAPI.setCalendarColor(calendarId, color).then(setPreferences)
@@ -216,7 +239,7 @@ export function App() {
       .then(refresh)
   }, [refresh])
 
-  if (view === 'settings') {
+  if (screen === 'settings') {
     return (
       <div className="app-shell">
         {actionError && (
@@ -229,7 +252,7 @@ export function App() {
           googleAccounts={googleAccounts}
           hiddenEvents={preferences.hiddenEvents}
           initialTab={settingsTab}
-          onBack={() => setView('calendar')}
+          onBack={() => setScreen('calendar')}
           onConnectGoogle={handleConnectGoogle}
           onDisconnectGoogle={handleDisconnectGoogle}
           onReconnectGoogle={handleReconnectGoogle}
@@ -244,11 +267,13 @@ export function App() {
   return (
     <div className="app-shell">
       <AppHeader
-        onNavigateWeek={setWeekStart}
+        anchorDate={anchorDate}
+        calendarView={calendarView}
+        onNavigate={setAnchorDate}
         onOpenSettings={openSettings}
         onRefresh={handleRefreshNow}
+        onViewChange={handleViewChange}
         refreshing={refreshing}
-        weekStart={weekStart}
       />
       <div className="app">
         <CalendarSidebar
@@ -268,14 +293,37 @@ export function App() {
               {actionError}
             </Notice>
           )}
-          <CalendarGrid
-            weekStart={weekStart}
-            canEditEvent={canEditEvent}
-            events={visibleEvents}
-            onEventTimeChange={handleEventTimeChange}
-            onHideEvent={handleHideEvent}
-            preferences={preferences}
-          />
+          {calendarView === 'month' && (
+            <MonthView
+              anchorDate={anchorDate}
+              events={visibleEvents}
+              onHideEvent={handleHideEvent}
+              onOpenDay={openDay}
+              preferences={preferences}
+            />
+          )}
+          {calendarView === 'agenda' && (
+            <AgendaView
+              anchorDate={anchorDate}
+              events={visibleEvents}
+              onHideEvent={handleHideEvent}
+              preferences={preferences}
+            />
+          )}
+          {calendarView === 'year' && (
+            <YearView anchorDate={anchorDate} events={visibleEvents} onOpenDay={openDay} />
+          )}
+          {(calendarView === 'day' || calendarView === 'week') && (
+            <CalendarGrid
+              anchorDate={anchorDate}
+              calendarView={calendarView}
+              canEditEvent={canEditEvent}
+              events={visibleEvents}
+              onEventTimeChange={handleEventTimeChange}
+              onHideEvent={handleHideEvent}
+              preferences={preferences}
+            />
+          )}
         </main>
       </div>
     </div>

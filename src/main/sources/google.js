@@ -149,6 +149,30 @@ async function listGoogleCalendars(calendarApi) {
   return calendars
 }
 
+// events.list caps a page at 250 by default, which a week never hit but a month
+// or a year easily does — without following nextPageToken the later part of the
+// range silently comes back empty.
+async function listAllEvents(calendarApi, calendarId, rangeStart, rangeEnd) {
+  const items = []
+  let pageToken
+
+  do {
+    const response = await calendarApi.events.list({
+      calendarId,
+      maxResults: 2500,
+      orderBy: 'startTime',
+      pageToken,
+      singleEvents: true,
+      timeMax: rangeEnd,
+      timeMin: rangeStart
+    })
+    items.push(...(response.data.items ?? []))
+    pageToken = response.data.nextPageToken
+  } while (pageToken)
+
+  return items
+}
+
 export async function fetchGoogleEvents(rangeStart, rangeEnd) {
   const events = []
   const sourceCalendars = []
@@ -183,17 +207,8 @@ export async function fetchGoogleEvents(rangeStart, rangeEnd) {
       })))
       const calendarEvents = await Promise.all(
         calendars.map(async (calendarEntry) => {
-          const response = await calendar.events.list({
-            calendarId: calendarEntry.id,
-            timeMin: rangeStart,
-            timeMax: rangeEnd,
-            singleEvents: true,
-            orderBy: 'startTime'
-          })
-
-          return (response.data.items ?? []).map((item) =>
-            mapGoogleEvent(item, account.id, calendarEntry)
-          )
+          const items = await listAllEvents(calendar, calendarEntry.id, rangeStart, rangeEnd)
+          return items.map((item) => mapGoogleEvent(item, account.id, calendarEntry))
         })
       )
 

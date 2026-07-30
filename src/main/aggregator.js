@@ -2,6 +2,7 @@ import Store from 'electron-store'
 import { fetchGoogleEvents } from './sources/google.js'
 import { fetchTrelloEvents } from './sources/trello.js'
 import { fetchRemindersEvents } from './sources/reminders.js'
+import { createSourceRangeCache } from './sourceRangeCache.js'
 
 const store = new Store({ name: 'calendar-personal-app' })
 
@@ -17,20 +18,14 @@ const FETCHERS = {
   reminders: fetchRemindersEvents
 }
 
-// In-memory per-source cache, keyed by the requested range. Re-navigating to
-// the same range within the TTL window reuses it instead of refetching.
-const cache = new Map()
+const cache = createSourceRangeCache()
 
 let lastStatuses = []
 let lastCalendars = []
 
 async function fetchSource(source, rangeStart, rangeEnd, force) {
-  const cached = cache.get(source)
-  const isFresh =
-    cached &&
-    cached.rangeStart === rangeStart &&
-    cached.rangeEnd === rangeEnd &&
-    Date.now() - cached.fetchedAt < TTL_MS[source]
+  const cached = cache.get(source, rangeStart, rangeEnd)
+  const isFresh = cached && Date.now() - cached.fetchedAt < TTL_MS[source]
 
   if (isFresh && !force) return cached
 
@@ -39,22 +34,22 @@ async function fetchSource(source, rangeStart, rangeEnd, force) {
 
   // A source going down shouldn't blank out data that was showing a moment
   // ago — keep the last good events for this source, just surface the error.
-  if (allFailed && cached) {
-    const stale = { ...cached, statuses: result.statuses }
-    cache.set(source, stale)
-    return stale
+  const fallback = cached ?? cache.lastFor(source)
+  if (allFailed && fallback) {
+    return cache.remember(source, rangeStart, rangeEnd, {
+      ...fallback,
+      statuses: result.statuses
+    })
   }
 
-  const entry = {
+  return cache.remember(source, rangeStart, rangeEnd, {
     rangeStart,
     rangeEnd,
     events: result.events,
     calendars: result.calendars ?? [],
     statuses: result.statuses,
     fetchedAt: Date.now()
-  }
-  cache.set(source, entry)
-  return entry
+  })
 }
 
 export async function getUnifiedEvents(rangeStart, rangeEnd, { force = false } = {}) {
@@ -87,7 +82,7 @@ export function getAvailableCalendars() {
 }
 
 export function invalidateSourceCache(source) {
-  cache.delete(source)
+  cache.invalidate(source)
   if (source === 'google') {
     lastCalendars = lastCalendars.filter((calendar) => calendar.source !== 'google')
     lastStatuses = lastStatuses.filter((status) => status.source !== 'google')
