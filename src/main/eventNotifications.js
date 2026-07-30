@@ -1,5 +1,12 @@
 const SKIPPED_STATUSES = new Set(['cancelled', 'completed'])
 
+// `setTimeout` stores its delay in a signed 32-bit int, so anything longer than
+// this overflows and fires the callback immediately. Notifications only ever
+// look a short way ahead, which keeps every delay far below the limit no matter
+// how wide a range the caller happens to hand us.
+const MAX_TIMER_DELAY_MS = 2147483647
+const DEFAULT_HORIZON_MS = 24 * 60 * 60 * 1000
+
 function normalizePreferences(preferences = {}) {
   return {
     calendarSidebarVisibility: preferences.calendarSidebarVisibility ?? {},
@@ -57,6 +64,7 @@ function notificationPayload(event, locale) {
 
 export function createEventNotificationScheduler({
   clearTimer = clearTimeout,
+  horizonMs = DEFAULT_HORIZON_MS,
   locale = undefined,
   now = () => Date.now(),
   requestAttention = () => {},
@@ -65,6 +73,7 @@ export function createEventNotificationScheduler({
 }) {
   const timers = new Map()
   const firedKeys = new Set()
+  const horizon = Math.min(horizonMs, MAX_TIMER_DELAY_MS)
 
   function isSchedulable(event, preferences, nowMs) {
     const startMs = eventStartTime(event)
@@ -72,6 +81,7 @@ export function createEventNotificationScheduler({
     return (
       startMs !== null &&
       startMs > nowMs &&
+      startMs <= nowMs + horizon &&
       !event.allDay &&
       !SKIPPED_STATUSES.has(event.status) &&
       isCalendarInSidebar(event, preferences) &&

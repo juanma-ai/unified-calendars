@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getUnifiedEvents } from './aggregator.js'
 import { getCalendarPreferences } from './calendarPreferences.js'
-import { registerIpcHandlers } from './ipc.js'
+import { registerIpcHandlers, scheduleEventNotifications } from './ipc.js'
 import { createMenuBarAgenda } from './menuBarAgenda.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -47,7 +47,8 @@ app.whenReady().then(() => {
     createWindow,
     getCalendarPreferences,
     getUnifiedEvents,
-    getMainWindow: () => mainWindow
+    getMainWindow: () => mainWindow,
+    onEventsRefreshed: (events) => scheduleEventNotifications(events)
   })
   menuBarAgenda.start()
 

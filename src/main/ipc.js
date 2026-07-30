@@ -74,7 +74,10 @@ const eventNotificationScheduler = createEventNotificationScheduler({
 
 let lastNotificationEvents = []
 
-function scheduleEventNotifications(events, preferences = getCalendarPreferences()) {
+// Fed by the menu bar agenda's rolling "today" refresh, never by the calendar
+// grid: which range the user happens to be looking at must not decide which
+// events get notified.
+export function scheduleEventNotifications(events, preferences = getCalendarPreferences()) {
   lastNotificationEvents = events
   eventNotificationScheduler.schedule(events, preferences)
   return events
@@ -86,8 +89,7 @@ function rescheduleEventNotifications(preferences) {
 
 export function registerIpcHandlers() {
   ipcMain.handle('calendar:getUnifiedEvents', async (_event, rangeStart, rangeEnd) => {
-    const events = await getUnifiedEvents(rangeStart, rangeEnd)
-    return scheduleEventNotifications(events)
+    return getUnifiedEvents(rangeStart, rangeEnd)
   })
 
   ipcMain.handle('calendar:getCachedEvents', () => {
@@ -103,8 +105,7 @@ export function registerIpcHandlers() {
   })
 
   ipcMain.handle('calendar:refreshNow', async (_event, rangeStart, rangeEnd) => {
-    const events = await getUnifiedEvents(rangeStart, rangeEnd, { force: true })
-    return scheduleEventNotifications(events)
+    return getUnifiedEvents(rangeStart, rangeEnd, { force: true })
   })
 
   ipcMain.handle('calendar:updateEventTime', (_event, payload) => {

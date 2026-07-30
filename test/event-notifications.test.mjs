@@ -115,6 +115,51 @@ test('skips past, all-day, completed, cancelled, and hidden events', () => {
   assert.equal(harness.timers.size, 0)
 })
 
+test('ignores events beyond the notification horizon', () => {
+  const harness = createTimerHarness()
+  const scheduler = createEventNotificationScheduler(harness)
+
+  scheduler.schedule(
+    [
+      { ...baseEvent, id: 'next-year', start: '2027-04-21T10:15:00.000Z' },
+      { ...baseEvent, id: 'next-month', start: '2026-08-30T10:15:00.000Z' }
+    ],
+    {}
+  )
+
+  assert.equal(harness.timers.size, 0)
+})
+
+test('never arms a timer long enough to overflow setTimeout', () => {
+  const harness = createTimerHarness()
+  const scheduler = createEventNotificationScheduler(harness)
+
+  scheduler.schedule(
+    Array.from({ length: 12 }, (_, index) => ({
+      ...baseEvent,
+      id: `event-${index}`,
+      start: new Date(harness.now() + index * 30 * 24 * 60 * 60 * 1000).toISOString()
+    })),
+    {}
+  )
+
+  for (const [, timer] of harness.timers) {
+    assert.ok(timer.delay > 0 && timer.delay <= 2147483647, `bad delay ${timer.delay}`)
+  }
+})
+
+test('honours a custom horizon without exceeding the timer limit', () => {
+  const harness = createTimerHarness()
+  const scheduler = createEventNotificationScheduler({
+    ...harness,
+    horizonMs: Number.MAX_SAFE_INTEGER
+  })
+
+  scheduler.schedule([{ ...baseEvent, id: 'far-future', start: '2029-04-21T10:15:00.000Z' }], {})
+
+  assert.equal(harness.timers.size, 0)
+})
+
 test('rescheduling cancels notifications for events that become hidden', () => {
   const harness = createTimerHarness()
   const scheduler = createEventNotificationScheduler(harness)
