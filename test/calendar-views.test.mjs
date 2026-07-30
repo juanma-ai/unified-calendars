@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  AGENDA_DAYS,
   buildAgendaSections,
   buildMonthCells,
   buildYearHeatmap,
@@ -36,15 +37,21 @@ test('week range runs Monday to Sunday around the anchor', () => {
   assert.equal(ymd(end), '2026-08-02')
 })
 
-test('month and agenda ranges expand to whole weeks', () => {
-  const month = getViewRange('month', anchor)
-  const agenda = getViewRange('agenda', anchor)
+test('month range expands to whole weeks', () => {
+  const { start, end } = getViewRange('month', anchor)
 
   // July 2026 starts on a Wednesday and ends on a Friday.
-  assert.equal(ymd(month.start), '2026-06-29')
-  assert.equal(ymd(month.end), '2026-08-02')
-  assert.equal(ymd(agenda.start), ymd(month.start))
-  assert.equal(ymd(agenda.end), ymd(month.end))
+  assert.equal(ymd(start), '2026-06-29')
+  assert.equal(ymd(end), '2026-08-02')
+})
+
+test('agenda range is a rolling window that opens on the anchor day', () => {
+  const { start, end } = getViewRange('agenda', anchor)
+
+  assert.equal(ymd(start), '2026-07-30')
+  assert.equal(start.getHours(), 0)
+  assert.equal(ymd(end), '2026-08-28')
+  assert.equal(end.getHours(), 23)
 })
 
 test('year range covers the whole calendar year', () => {
@@ -63,11 +70,12 @@ test('month grid days are whole weeks starting on Monday', () => {
   assert.equal(ymd(days.at(-1)), '2026-08-02')
 })
 
-test('agenda days match the month grid, day view is a single day', () => {
-  assert.deepEqual(
-    getViewDays('agenda', anchor).map(ymd),
-    getViewDays('month', anchor).map(ymd)
-  )
+test('agenda days start on the anchor, day view is a single day', () => {
+  const days = getViewDays('agenda', anchor).map(ymd)
+
+  assert.equal(days.length, AGENDA_DAYS)
+  assert.equal(days[0], '2026-07-30')
+  assert.equal(days.at(-1), '2026-08-28')
   assert.deepEqual(getViewDays('day', anchor).map(ymd), ['2026-07-30'])
   assert.equal(getViewDays('week', anchor).length, 7)
 })
@@ -76,7 +84,7 @@ test('labels are formatted per view', () => {
   assert.equal(formatViewLabel('day', anchor), 'Thu, Jul 30, 2026')
   assert.equal(formatViewLabel('week', anchor), 'Jul 27 – Aug 2, 2026')
   assert.equal(formatViewLabel('month', anchor), 'July 2026')
-  assert.equal(formatViewLabel('agenda', anchor), 'July 2026')
+  assert.equal(formatViewLabel('agenda', anchor), 'Jul 30 – Aug 28, 2026')
   assert.equal(formatViewLabel('year', anchor), '2026')
 })
 
@@ -85,6 +93,7 @@ test('navigation steps by the active view unit', () => {
   assert.equal(ymd(navigateView('day', anchor, -1)), '2026-07-29')
   assert.equal(ymd(navigateView('week', anchor, 1)), '2026-08-06')
   assert.equal(ymd(navigateView('month', anchor, 1)), '2026-08-30')
+  assert.equal(ymd(navigateView('agenda', anchor, 1)), '2026-08-29')
   assert.equal(ymd(navigateView('agenda', anchor, -1)), '2026-06-30')
   assert.equal(ymd(navigateView('year', anchor, 1)), '2027-07-30')
 })
