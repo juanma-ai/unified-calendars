@@ -1376,4 +1376,117 @@ input {
 
 .calendar-month__tracked span {
   border-radius: 1px;
+
+   Issue #7 — sidebar Time Tracker section: master switch, per-project totals
+   and the range summary (label, stacked proportion bar, running session).
+   --------------------------------------------------------------------------- */
+
+.calendar-sidebar__section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-sidebar__section-header h2 {
+  flex: 1 1 auto;
+}
+
+/* The tracker doubles as a time report, so it gets a rule of its own above it. */
+.calendar-sidebar__section--tracked {
+  padding-top: 14px;
+  border-top: 1px solid #ededed;
+}
+
+.calendar-sidebar__section--tracked .components-form-toggle {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+/* Switching the source off leaves the rows in place, just visibly inert: the sidebar
+   never removes a calendar, it only stops drawing its events. */
+.calendar-sidebar__section--tracked.is-source-off .calendar-sidebar__calendar {
+  opacity: 0.55;
+}
+
+.calendar-sidebar__duration {
+  min-width: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-sidebar__tracked-hint {
+  margin: 6px 0 0;
+  padding: 0 4px;
+  color: #8d8d8d;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.calendar-sidebar__tracked-summary {
+  margin: 10px 4px 0;
+  padding-top: 10px;
+  border-top: 1px solid #ededed;
+}
+
+.calendar-sidebar__tracked-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calendar-sidebar__tracked-total strong {
+  color: #1e1e1e;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Segments are proportional widths in a flex row on a track, so rounding can leave a
+   sliver of track showing but can never overflow. */
+.calendar-sidebar__tracked-bar {
+  display: flex;
+  gap: 1px;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  background: #ededed;
+  border-radius: 2px;
+}
+
+.calendar-sidebar__tracked-running {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.calendar-sidebar__tracked-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  background: currentcolor;
+  border-radius: 50%;
+  animation: calendar-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes calendar-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-sidebar__tracked-dot {
+    animation: none;
+  }
 }

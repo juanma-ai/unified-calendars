@@ -7,6 +7,7 @@ import {
   buildMonthCells,
   buildTrackedDayTotals,
   buildYearHeatmap,
+  formatTrackedRangeLabel,
   formatViewLabel,
   getViewDays,
   getViewRange,
@@ -281,4 +282,18 @@ test('tracked day totals grow a running session up to now', () => {
   )
 
   assert.equal(day.totalMs, 2 * 60 * 60 * 1000)
+})
+
+test('formatTrackedRangeLabel names the range the totals cover', () => {
+  assert.equal(formatTrackedRangeLabel('day', anchor, anchor), 'Tracked today')
+  assert.equal(formatTrackedRangeLabel('week', anchor, anchor), 'Tracked this week')
+  assert.equal(formatTrackedRangeLabel('month', anchor, anchor), 'Tracked in July')
+  assert.equal(formatTrackedRangeLabel('year', anchor, anchor), 'Tracked in 2026')
+  assert.equal(formatTrackedRangeLabel('agenda', anchor, anchor), 'Tracked in range')
+})
+
+test('formatTrackedRangeLabel only says "today" when the day view is on today', () => {
+  const yesterday = new Date(2026, 6, 29, 12, 0)
+
+  assert.equal(formatTrackedRangeLabel('day', yesterday, anchor), 'Tracked on Wed, Jul 29')
 })

@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Button,
   ColorPicker,
   DropdownMenu,
+  FormToggle,
   MenuGroup,
   SearchControl
 } from '@wordpress/components'
 import { moreVertical } from '@wordpress/icons'
+
+import { formatTrackedRangeLabel } from '../calendarViews.js'
+import { formatDuration } from '../trackedTime.js'
+import { buildTrackedSummary, trackedMsByCalendar } from '../trackedSummary.js'
 
 const SOURCE_LABELS = {
   google: 'Google Calendar',
@@ -34,7 +39,7 @@ function getStatusText(status) {
   return `${sourceLabel}: ${status.lastError ?? 'error'}`
 }
 
-function CalendarRow({ calendar, onColorChange, onVisibilityChange }) {
+function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
@@ -56,7 +61,11 @@ function CalendarRow({ calendar, onColorChange, onVisibilityChange }) {
         />
         <span className="calendar-sidebar__calendar-name">{calendar.name}</span>
       </Button>
-      <span className="calendar-sidebar__count">{calendar.count}</span>
+      <span
+        className={`calendar-sidebar__count${countLabel ? ' calendar-sidebar__duration' : ''}`}
+      >
+        {countLabel ?? calendar.count}
+      </span>
       <div className="calendar-sidebar__calendar-menu">
         <DropdownMenu
           icon={moreVertical}
@@ -85,6 +94,37 @@ function CalendarRow({ calendar, onColorChange, onVisibilityChange }) {
   )
 }
 
+/**
+ * The tracked-time report under the project rows: total for the range on screen, a stacked
+ * proportion bar and, while a timer runs, the open session. The bar is decorative — every
+ * number in it is already spelled out in the lines around it — so it is hidden from
+ * assistive tech rather than described twice.
+ */
+function TrackedSummary({ anchorDate, calendarView, summary }) {
+  return (
+    <div className="calendar-sidebar__tracked-summary">
+      <div className="calendar-sidebar__tracked-total">
+        <span>{formatTrackedRangeLabel(calendarView, anchorDate)}</span>
+        <strong>{formatDuration(summary.totalMs)}</strong>
+      </div>
+      <div className="calendar-sidebar__tracked-bar" aria-hidden="true">
+        {summary.segments.map((segment) => (
+          <span
+            key={segment.calendarId}
+            style={{ width: `${segment.percent}%`, background: segment.color }}
+          />
+        ))}
+      </div>
+      {summary.running && (
+        <p className="calendar-sidebar__tracked-running" style={{ color: summary.running.color }}>
+          <span className="calendar-sidebar__tracked-dot" aria-hidden="true" />
+          {`${summary.running.project} running · ${formatDuration(summary.running.ms)}`}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SourceStatus({ status }) {
   const text = getStatusText(status)
 
@@ -97,17 +137,55 @@ function SourceStatus({ status }) {
 }
 
 export function CalendarSidebar({
+  anchorDate,
   calendars,
   calendarCountBySource,
+  calendarView,
   hiddenEventCount,
+  now,
   onColorChange,
   onOpenSettings,
+  onSourceEnabledChange,
   onVisibilityChange,
   searchQuery,
   setSearchQuery,
-  statuses
+  statuses,
+  trackedEnabled = true,
+  trackedEvents = []
 }) {
   const failingStatuses = statuses.filter((status) => !status.ok)
+
+  const trackedColors = useMemo(
+    () =>
+      Object.fromEntries(
+        calendars
+          .filter((calendar) => calendar.source === 'timetracker')
+          .map((calendar) => [calendar.id, calendar.color])
+      ),
+    [calendars]
+  )
+  // Row durations count every tracked session in the range, so a hidden project still
+  // says how much it holds. The summary below takes only the visible ones, which is what
+  // keeps its total and its bar matching the calendar.
+  const rowDurations = useMemo(() => trackedMsByCalendar(trackedEvents, now), [trackedEvents, now])
+  const visibleTrackedIds = useMemo(
+    () =>
+      new Set(
+        calendars
+          .filter((calendar) => calendar.source === 'timetracker' && calendar.visible)
+          .map((calendar) => calendar.id)
+      ),
+    [calendars]
+  )
+  const summary = useMemo(
+    () =>
+      buildTrackedSummary(
+        trackedEvents.filter((event) => visibleTrackedIds.has(event.calendarId)),
+        trackedColors,
+        now
+      ),
+    [now, trackedColors, trackedEvents, visibleTrackedIds]
+  )
 
   return (
     <aside className="calendar-sidebar">
@@ -129,12 +207,31 @@ export function CalendarSidebar({
             const isTimetracker = source === 'timetracker'
 
             return (
-              <section className="calendar-sidebar__section" key={source}>
-                <h2>{label}</h2>
+              <section
+                className={`calendar-sidebar__section${
+                  isTimetracker ? ' calendar-sidebar__section--tracked' : ''
+                }${isTimetracker && !trackedEnabled ? ' is-source-off' : ''}`}
+                key={source}
+              >
+                <div className="calendar-sidebar__section-header">
+                  <h2>{label}</h2>
+                  {isTimetracker && (
+                    <FormToggle
+                      aria-label="Show tracked time"
+                      checked={trackedEnabled}
+                      onChange={() => onSourceEnabledChange(source, !trackedEnabled)}
+                    />
+                  )}
+                </div>
                 {sourceCalendars.length > 0 ? (
                   sourceCalendars.map((calendar) => (
                     <CalendarRow
                       calendar={calendar}
+                      countLabel={
+                        isTimetracker
+                          ? formatDuration(rowDurations[calendar.id] ?? 0)
+                          : undefined
+                      }
                       key={calendar.id}
                       onColorChange={onColorChange}
                       onVisibilityChange={onVisibilityChange}
@@ -169,6 +266,18 @@ export function CalendarSidebar({
                           : 'Open settings'}
                     </Button>
                   </div>
+                )}
+                {isTimetracker && sourceCalendars.length > 0 && (
+                  <p className="calendar-sidebar__tracked-hint">
+                    Click a project to hide it on the calendar.
+                  </p>
+                )}
+                {isTimetracker && trackedEnabled && summary.segments.length > 0 && (
+                  <TrackedSummary
+                    anchorDate={anchorDate}
+                    calendarView={calendarView}
+                    summary={summary}
+                  />
                 )}
               </section>
             )
