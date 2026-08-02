@@ -1,10 +1,20 @@
-import { addDays, addMinutes, differenceInMinutes, startOfDay } from 'date-fns'
+import { addDays, addMinutes, differenceInMinutes, isSameDay, startOfDay } from 'date-fns'
+import { effectiveEnd } from './trackedTime.js'
 
 export const HOUR_HEIGHT = 64
 export const MINIMUM_EVENT_MINUTES = 30
 export const SNAP_MINUTES = 15
+// The tracked lane, in px: a 22px strip pinned to the right edge of a day column, with
+// the bar centred in it. Kept here rather than only in CSS because the layout maths
+// below has to know the lane exists.
+export const TRACKED_LANE_WIDTH = 22
+export const TRACKED_BAR_WIDTH = 14
+// The tracker records seconds, so a mis-click leaves a 9-second session behind. Floored
+// at one minute it draws as a 1px sliver nobody can hover; six minutes is ~6px.
+export const MINIMUM_TRACKED_MINUTES = 6
 const MINUTES_PER_DAY = 24 * 60
 const DAY_MS = 24 * 60 * 60 * 1000
+const MINUTE_MS = 60_000
 
 export function snapToInterval(minutes, interval = SNAP_MINUTES) {
   return Math.round(minutes / interval) * interval
@@ -116,6 +126,49 @@ function timedPosition(event, day) {
   }
 }
 
+export function isTrackedEvent(event) {
+  return event.source === 'timetracker'
+}
+
+/**
+ * A tracked bar's geometry. Unlike `timedPosition` this keeps fractional minutes — a bar
+ * is pure duration, so rounding it to whole minutes is a visible lie at hour height 64 —
+ * and it reads the end through `effectiveEnd`, so a running session keeps growing between
+ * source refreshes. A session that started yesterday or runs past midnight is clipped to
+ * this day; a session too short to see is grown to `MINIMUM_TRACKED_MINUTES`, upward when
+ * that would otherwise push it past midnight.
+ */
+function trackedPosition(event, day, now) {
+  const dayStart = startOfDay(day)
+  const dayEnd = addDays(dayStart, 1)
+  const eventStart = new Date(event.start)
+  const eventEnd = new Date(effectiveEnd(event, now))
+  const clampedStart = eventStart < dayStart ? dayStart : eventStart
+  const clampedEnd = eventEnd > dayEnd ? dayEnd : eventEnd
+  const rawMinutes = Math.max(0, (clampedEnd.getTime() - clampedStart.getTime()) / MINUTE_MS)
+  const durationMinutes = Math.max(MINIMUM_TRACKED_MINUTES, rawMinutes)
+  const startMinutes = clamp(
+    (clampedStart.getTime() - dayStart.getTime()) / MINUTE_MS,
+    0,
+    MINUTES_PER_DAY - durationMinutes
+  )
+
+  return {
+    event,
+    startMinutes,
+    durationMinutes,
+    endMinutes: startMinutes + durationMinutes,
+    column: 0,
+    columnCount: 1
+  }
+}
+
+function overlapsDay(event, day, now) {
+  const dayStart = startOfDay(day)
+  const dayEnd = addDays(dayStart, 1)
+  return new Date(event.start) < dayEnd && new Date(effectiveEnd(event, now)) > dayStart
+}
+
 function assignOverlapColumns(events) {
   const sorted = [...events].sort(
     (a, b) => a.startMinutes - b.startMinutes || b.durationMinutes - a.durationMinutes
@@ -152,11 +205,32 @@ function assignOverlapColumns(events) {
   return sorted
 }
 
-export function buildDayLayout(events, day) {
-  const allDayEvents = events.filter((event) => event.allDay)
+/**
+ * Buckets a day's events into the three things the grid draws: the all-day row, the
+ * scheduled events that share the column, and the tracked bars in the lane. Tracked
+ * sessions are pulled out *before* the overlap columns are assigned, so a bar can never
+ * widen, narrow or shift a scheduled event, nor the other way round. The lane runs
+ * through the same overlap pass only as a safety net: the tracker keeps one timer at a
+ * time, so overlapping rows mean a damaged database, and side-by-side slivers beat bars
+ * hidden behind each other.
+ *
+ * Selection happens here rather than in the component: a scheduled event belongs to the
+ * day it starts on, but a tracked session belongs to every day it touches, or an
+ * overnight session would vanish from today's column at midnight.
+ */
+export function buildDayLayout(events, day, { now = Date.now() } = {}) {
+  const scheduled = events.filter(
+    (event) => !isTrackedEvent(event) && isSameDay(new Date(event.start), day)
+  )
+  const allDayEvents = scheduled.filter((event) => event.allDay)
   const timedEvents = assignOverlapColumns(
-    events.filter((event) => !event.allDay).map((event) => timedPosition(event, day))
+    scheduled.filter((event) => !event.allDay).map((event) => timedPosition(event, day))
+  )
+  const trackedEvents = assignOverlapColumns(
+    events
+      .filter((event) => isTrackedEvent(event) && !event.allDay && overlapsDay(event, day, now))
+      .map((event) => trackedPosition(event, day, now))
   )
 
-  return { allDayEvents, timedEvents }
+  return { allDayEvents, timedEvents, trackedEvents }
 }

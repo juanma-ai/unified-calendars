@@ -1312,3 +1312,68 @@ input {
   color: #50575e;
   font-size: 14px;
 }
+
+/* ---------------------------------------------------------------------------
+ * Time Tracker split lane (issue #6)
+ *
+ * Tracked sessions get their own channel in every view so they never compete
+ * with scheduled events for space: a lane pinned to the right of each day
+ * column in Week and Day, a bottom strip in Month, project dots in Year.
+ * ------------------------------------------------------------------------- */
+
+.calendar-week__time-day.has-tracked-lane {
+  /* Read by the inline geometry of the scheduled events, which stop at the lane. */
+  --tracked-lane-total: 23px;
+}
+
+.calendar-week__tracked-lane {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--tracked-lane-total, 23px);
+  background: #fafafa;
+  border-left: 1px solid #f0f0f0;
+}
+
+.calendar-week__time-day.is-today .calendar-week__tracked-lane {
+  background: #f5f6fb;
+  border-left-color: #e9ebf5;
+}
+
+/* No text: the bar is pure duration, and its title/aria-label names it. */
+.calendar-week__tracked-bar {
+  position: absolute;
+  border-radius: 2px;
+}
+
+/* An open session has no end yet, so it is drawn as still going: flat bottom
+ * edge, with a dot marking it live. Issue #9 owns the pulse and the counter. */
+.calendar-week__tracked-bar.is-running {
+  border-radius: 2px 2px 0 0;
+}
+
+.calendar-week__tracked-live {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateX(-50%);
+}
+
+/* Month: one segment per project along the bottom of the cell, length
+ * proportional to hours worked (ten hours fills the cell). */
+.calendar-month__tracked {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1px;
+  height: 6px;
+}
+
+.calendar-month__tracked span {
+  border-radius: 1px;
+}

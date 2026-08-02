@@ -5,12 +5,14 @@ import {
   AGENDA_DAYS,
   buildAgendaSections,
   buildMonthCells,
+  buildTrackedDayTotals,
   buildYearHeatmap,
   formatViewLabel,
   getViewDays,
   getViewRange,
   isCalendarView,
-  navigateView
+  navigateView,
+  TRACKED_FULL_DAY_MS
 } from '../src/renderer/src/calendarViews.js'
 
 const anchor = new Date(2026, 6, 30, 12, 0) // Thu 30 July 2026
@@ -200,4 +202,83 @@ test('agenda sections omit tracked sessions, which record past work', () => {
     sections.flatMap((section) => section.events.map((event) => event.title)),
     ['Standup']
   )
+})
+
+const trackedSessions = [
+  {
+    id: 'timetracker:1',
+    source: 'timetracker',
+    calendarId: 'timetracker:certification',
+    calendarName: 'certification',
+    title: 'certification',
+    start: '2026-07-30T10:05:00+02:00',
+    end: '2026-07-30T11:52:00+02:00'
+  },
+  {
+    id: 'timetracker:2',
+    source: 'timetracker',
+    calendarId: 'timetracker:admin',
+    calendarName: 'admin',
+    title: 'admin',
+    start: '2026-07-30T14:00:00+02:00',
+    end: '2026-07-30T14:30:00+02:00'
+  },
+  {
+    id: 'timetracker:3',
+    source: 'timetracker',
+    calendarId: 'timetracker:certification',
+    calendarName: 'certification',
+    title: 'certification',
+    start: '2026-07-30T16:00:00+02:00',
+    end: '2026-07-30T17:00:00+02:00'
+  }
+]
+
+test('month cells leave tracked sessions to the strip along the bottom of the cell', () => {
+  const days = [new Date(2026, 6, 30)]
+  const [cell] = buildMonthCells([...events, ...trackedSessions], days)
+
+  assert.deepEqual(cell.events.map((event) => event.id), ['a', 'b', 'c'])
+  assert.equal(cell.overflowCount, 0)
+})
+
+test('tracked day totals merge a day into one segment per project, longest first', () => {
+  const days = [new Date(2026, 6, 30), new Date(2026, 6, 31)]
+  const [busy, quiet] = buildTrackedDayTotals([...events, ...trackedSessions], days)
+
+  assert.deepEqual(
+    busy.projects.map((entry) => [entry.project, entry.ms / TRACKED_FULL_DAY_MS]),
+    [
+      ['certification', (107 + 60) / 600],
+      ['admin', 30 / 600]
+    ]
+  )
+  // The segment carries an event of its own project, so the caller can colour it.
+  assert.equal(busy.projects[0].event.calendarId, 'timetracker:certification')
+  assert.equal(busy.totalMs, (107 + 60 + 30) * 60 * 1000)
+
+  assert.deepEqual(quiet.projects, [])
+  assert.equal(quiet.totalMs, 0)
+})
+
+test('tracked day totals grow a running session up to now', () => {
+  const now = new Date('2026-07-30T12:00:00+02:00').getTime()
+  const [day] = buildTrackedDayTotals(
+    [
+      {
+        id: 'timetracker:open',
+        source: 'timetracker',
+        calendarId: 'timetracker:certification',
+        calendarName: 'certification',
+        title: 'certification',
+        start: '2026-07-30T10:00:00+02:00',
+        end: '2026-07-30T10:30:00+02:00',
+        isRunning: true
+      }
+    ],
+    [new Date(2026, 6, 30)],
+    now
+  )
+
+  assert.equal(day.totalMs, 2 * 60 * 60 * 1000)
 })

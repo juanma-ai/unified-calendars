@@ -1,4 +1,4 @@
-import { differenceInMinutes, format, isSameDay, isToday, startOfDay } from 'date-fns'
+import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
 import { formatViewLabel, getViewDays } from '../calendarViews.js'
@@ -10,6 +10,8 @@ import {
   HOUR_HEIGHT,
   SNAP_MINUTES
 } from '../calendarTimeGrid.js'
+import { getEventColor, isSourceEnabled } from '../calendarViewModel.js'
+import { durationMs, effectiveEnd, isRunning, formatDuration } from '../trackedTime.js'
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 const CURRENT_TIME_REFRESH_MS = 60 * 1000
@@ -36,6 +38,17 @@ function hasSameTimes(event, times) {
   const start = new Date(event.start).getTime()
   const end = new Date(event.end ?? event.start).getTime()
   return start === new Date(times.start).getTime() && end === new Date(times.end).getTime()
+}
+
+// `certification · 10:05–11:52 · 1h 47m`, or `certification · 15:30 – now · 1h 12m` while
+// the timer is open. The bar itself carries no text, so this is the only thing that
+// names it, for a mouse and for a screen reader alike.
+function getTrackedLabel(event, now) {
+  const start = format(new Date(event.start), 'HH:mm')
+  const end = isRunning(event) ? 'now' : format(new Date(effectiveEnd(event, now)), 'HH:mm')
+  const separator = isRunning(event) ? ' – ' : '–'
+
+  return `${event.title} · ${start}${separator}${end} · ${formatDuration(durationMs(event, now))}`
 }
 
 function getPreviewGeometry(times) {
@@ -221,10 +234,10 @@ export function CalendarGrid({
     [canEditEvent, canResizeEvent, onEventTimeChange]
   )
 
-  const layouts = days.map((day) => {
-    const dayEvents = events.filter((event) => isSameDay(new Date(event.start), day))
-    return buildDayLayout(dayEvents, day)
-  })
+  // The lane is reserved whenever the source is on, even on a day with nothing tracked,
+  // so scheduled events keep the same width as you page through the weeks.
+  const showTrackedLane = isSourceEnabled(preferences, 'timetracker')
+  const layouts = days.map((day) => buildDayLayout(events, day, { now: now.getTime() }))
   const rangeContainsToday = days.some((day) => isToday(day))
   const currentTimeTop = (getCurrentMinutes(now) / 60) * HOUR_HEIGHT
 
@@ -305,7 +318,9 @@ export function CalendarGrid({
                 const currentDay = isToday(days[dayIndex])
                 return (
                   <div
-                    className={`calendar-week__time-day${currentDay ? ' is-today' : ''}`}
+                    className={`calendar-week__time-day${currentDay ? ' is-today' : ''}${
+                      showTrackedLane ? ' has-tracked-lane' : ''
+                    }`}
                     key={days[dayIndex].toISOString()}
                   >
                     {layout.timedEvents.map((position) => {
@@ -333,8 +348,14 @@ export function CalendarGrid({
                           style={{
                             top: geometry.top,
                             height: geometry.height,
-                            left: `${(position.column / position.columnCount) * 100}%`,
-                            width: `${100 / position.columnCount}%`,
+                            // The lane, when present, is carved off the right of the
+                            // column before the overlap columns are shared out.
+                            left: `calc((100% - var(--tracked-lane-total, 0px)) * ${
+                              position.column / position.columnCount
+                            })`,
+                            width: `calc((100% - var(--tracked-lane-total, 0px)) / ${
+                              position.columnCount
+                            })`,
                             transform: dragging
                               ? `translateX(${drag.deltaDays * drag.dayWidth}px)`
                               : undefined
@@ -363,6 +384,40 @@ export function CalendarGrid({
                         </div>
                       )
                     })}
+                    {showTrackedLane && (
+                      <div className="calendar-week__tracked-lane">
+                        {layout.trackedEvents.map((position) => {
+                          const event = position.event
+                          const running = isRunning(event)
+
+                          return (
+                            <div
+                              aria-label={getTrackedLabel(event, now.getTime())}
+                              className={`calendar-week__tracked-bar${running ? ' is-running' : ''}`}
+                              key={event.id}
+                              role="img"
+                              style={{
+                                top: (position.startMinutes / 60) * HOUR_HEIGHT,
+                                height: (position.durationMinutes / 60) * HOUR_HEIGHT,
+                                // A 4px gutter each side leaves the 14px bar of the
+                                // mockup; the column split only ever kicks in for
+                                // overlapping rows, which the tracker cannot produce.
+                                left: `calc(4px + (100% - 8px) * ${
+                                  position.column / position.columnCount
+                                })`,
+                                width: `calc((100% - 8px) / ${position.columnCount})`,
+                                background: getEventColor(event, preferences)
+                              }}
+                              title={getTrackedLabel(event, now.getTime())}
+                            >
+                              {running && (
+                                <span aria-hidden="true" className="calendar-week__tracked-live" />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}

@@ -16,6 +16,7 @@ import {
   startOfYear
 } from 'date-fns'
 import { formatWeekRange, WEEK_OPTIONS } from './calendarDates.js'
+import { totalsByProject } from './trackedTime.js'
 
 export const VIEWS = ['day', 'week', 'month', 'year', 'agenda']
 export const DEFAULT_VIEW = 'week'
@@ -118,13 +119,21 @@ function byStart(a, b) {
   return new Date(a.start) - new Date(b.start)
 }
 
+function isTrackedEvent(event) {
+  return event.source === 'timetracker'
+}
+
 /**
  * Buckets events into the month grid's day cells. Events are keyed by their
  * start day, matching how the week time grid places them, so a multi-day event
  * shows only on the day it begins.
+ *
+ * Tracked sessions are left out: the cell draws them as the proportional strip
+ * along its bottom edge (`buildTrackedDayTotals`), and a busy day of tracking
+ * would otherwise push every meeting out of the cell behind a "+5 more".
  */
 export function buildMonthCells(events, days, maxPerDay = Number.POSITIVE_INFINITY) {
-  const sorted = [...events].sort(byStart)
+  const sorted = [...events].filter((event) => !isTrackedEvent(event)).sort(byStart)
 
   return days.map((day) => {
     const dayEvents = sorted.filter((event) => isSameDay(new Date(event.start), day))
@@ -132,6 +141,37 @@ export function buildMonthCells(events, days, maxPerDay = Number.POSITIVE_INFINI
       day,
       events: dayEvents.slice(0, maxPerDay),
       overflowCount: Math.max(0, dayEvents.length - maxPerDay)
+    }
+  })
+}
+
+// Ten hours of tracked work fills a month cell's strip. A fixed reference keeps the
+// cells comparable with each other and from month to month, which normalising against
+// the busiest day of the month would not.
+export const TRACKED_FULL_DAY_MS = 10 * 60 * 60 * 1000
+
+/**
+ * Per-day tracked totals for the month grid, one entry per day in `days`, each holding
+ * the day's projects (longest first) and the total. `event` rides along so the caller
+ * can colour a segment through `getEventColor` without repeating the colour rules.
+ *
+ * Sessions count towards the day they started on, like everything else in the month
+ * grid; only the time grid, where a bar is a physical length, splits them at midnight.
+ */
+export function buildTrackedDayTotals(events, days, now = Date.now()) {
+  const tracked = events.filter(isTrackedEvent)
+
+  return days.map((day) => {
+    const dayEvents = tracked.filter((event) => isSameDay(new Date(event.start), day))
+    const projects = totalsByProject(dayEvents, now).map((entry) => ({
+      ...entry,
+      event: dayEvents.find((event) => event.calendarId === entry.calendarId)
+    }))
+
+    return {
+      day,
+      projects,
+      totalMs: projects.reduce((sum, entry) => sum + entry.ms, 0)
     }
   })
 }
