@@ -1312,3 +1312,69 @@ input {
   color: #50575e;
   font-size: 14px;
 }
+
+/* --- Issue #10: split-lane legend strip (SourceLegend.jsx) ------------------ */
+
+.source-legend {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #ededed;
+}
+
+/*
+ * `.calendar-main` is a plain block, so the grid's `height: 100%` would push its bottom
+ * out of the clipped main once the strip sits above it. Scoped to the strip's presence so
+ * the other views' layout is untouched.
+ */
+.calendar-main:has(.source-legend) {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-main:has(.source-legend) > .calendar-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.source-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #707070;
+  font-size: 12px;
+}
+
+.source-legend__swatch {
+  flex: none;
+  border-radius: 2px;
+}
+
+/* The shape of a scheduled event pill. */
+.source-legend__swatch--scheduled {
+  width: 18px;
+  height: 10px;
+  border: 1px solid rgba(56, 88, 233, 0.35);
+  border-left: 3px solid #3858e9;
+  background: rgba(56, 88, 233, 0.12);
+}
+
+/* The shape of a tracked-session lane bar; the fill comes from SOURCE_COLORS. */
+.source-legend__swatch--tracked {
+  width: 6px;
+  height: 12px;
+}
+
+.source-legend__hint {
+  margin-left: auto;
+  color: #8d8d8d;
+  font-size: 12px;
+}
+
+.source-legend__hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
