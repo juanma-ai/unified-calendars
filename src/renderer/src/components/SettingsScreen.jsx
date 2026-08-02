@@ -16,7 +16,8 @@ import { format } from 'date-fns'
 const SOURCE_NAMES = {
   google: 'Google Calendar',
   trello: 'Trello',
-  reminders: 'Apple Reminders'
+  reminders: 'Apple Reminders',
+  timetracker: 'Time Tracker'
 }
 
 function ConnectionBadge({ ok }) {
@@ -100,7 +101,12 @@ function GoogleConnectionCard({ accounts, onConnect, onDisconnect, onReconnect, 
 
 function ConnectionCard({ source, statuses }) {
   const sourceStatuses = statuses.filter((status) => status.source === source)
-  const connected = sourceStatuses.length > 0 && sourceStatuses.every((status) => status.ok)
+  // A source can be ok while having nothing behind it: the time tracker reports ok with
+  // `detected: false` when there is no database, because a missing tracker is not a
+  // failure worth putting in the sidebar footer. It must not read as Connected here.
+  const connected =
+    sourceStatuses.length > 0 &&
+    sourceStatuses.every((status) => status.ok && status.detected !== false)
 
   return (
     <Card className="settings-card">
@@ -131,6 +137,12 @@ function ConnectionCard({ source, statuses }) {
         )}
         {source === 'reminders' && (
           <p>Access is controlled by macOS in Privacy &amp; Security → Reminders.</p>
+        )}
+        {source === 'timetracker' && (
+          <p>
+            Reads <code>~/.timetracker/timetracker.db</code> — nothing to connect.
+            {!connected && ' No tracker database was found there.'}
+          </p>
         )}
       </CardBody>
     </Card>
@@ -309,7 +321,7 @@ export function SettingsScreen({
                 onReconnect={onReconnectGoogle}
                 statuses={statuses}
               />
-              {['trello', 'reminders'].map((source) => (
+              {['trello', 'reminders', 'timetracker'].map((source) => (
                 <ConnectionCard key={source} source={source} statuses={statuses} />
               ))}
             </div>

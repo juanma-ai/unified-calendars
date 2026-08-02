@@ -1295,6 +1295,18 @@ input {
   line-height: 1.4;
 }
 
+/* Tracked session notes arrive verbatim from the tracker, newlines and all. */
+.event-actions-popover__notes span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.event-actions-popover__notes time {
+  color: #8d8d8d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
 .settings-calendar-list__intro {
   margin: 0 0 16px;
   color: #50575e;

@@ -11,7 +11,8 @@ import { moreVertical } from '@wordpress/icons'
 const SOURCE_LABELS = {
   google: 'Google Calendar',
   trello: 'Trello',
-  reminders: 'Reminders'
+  reminders: 'Reminders',
+  timetracker: 'Time Tracker'
 }
 
 function compactAccountLabel(value) {
@@ -125,6 +126,7 @@ export function CalendarSidebar({
             const hasAvailableCalendars = Boolean(calendarCountBySource?.[source])
             const isGoogle = source === 'google'
             const isTrello = source === 'trello'
+            const isTimetracker = source === 'timetracker'
 
             return (
               <section className="calendar-sidebar__section" key={source}>
@@ -147,8 +149,12 @@ export function CalendarSidebar({
                         'No Google calendars are connected yet.'}
                       {!hasAvailableCalendars && isTrello && 'No Trello boards are available yet.'}
                       {!hasAvailableCalendars &&
+                        isTimetracker &&
+                        'No tracked projects yet — start a timer in Time Tracker.'}
+                      {!hasAvailableCalendars &&
                         !isGoogle &&
                         !isTrello &&
+                        !isTimetracker &&
                         'No calendars connected here yet.'}
                     </p>
                     <Button

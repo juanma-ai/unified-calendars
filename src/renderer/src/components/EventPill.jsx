@@ -113,6 +113,18 @@ export function EventPill({
               <span>Due: {trelloDueLabel}</span>
             </div>
           )}
+          {event.source === 'timetracker' && event.notes?.length > 0 && (
+            <div className="event-actions-popover__meta event-actions-popover__notes">
+              {event.notes.map((note, index) => (
+                <span key={`${note.ts}:${index}`}>
+                  <time dateTime={note.ts}>{format(new Date(note.ts), 'HH:mm')}</time>{' '}
+                  {/* The tracker stores notes verbatim, so markdown is common. Showing it
+                      literally is the safer default than guessing at a renderer. */}
+                  {note.text}
+                </span>
+              ))}
+            </div>
+          )}
           {event.url && (
             <MenuItem
               icon={external}
