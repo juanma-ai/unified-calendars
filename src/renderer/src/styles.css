@@ -1364,3 +1364,16 @@ input {
   background: #fff;
   transform: translateX(-50%);
 }
+
+/* Month: one segment per project along the bottom of the cell, length
+ * proportional to hours worked (ten hours fills the cell). */
+.calendar-month__tracked {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1px;
+  height: 6px;
+}
+
+.calendar-month__tracked span {
+  border-radius: 1px;
+}
