@@ -173,3 +173,31 @@ test('agenda sections drop empty days and stay chronological', () => {
   assert.deepEqual(sections.map((section) => ymd(section.day)), ['2026-07-30', '2026-07-31'])
   assert.deepEqual(sections[0].events.map((event) => event.id), ['a', 'b', 'c'])
 })
+
+test('agenda sections omit tracked sessions, which record past work', () => {
+  const days = getViewDays('agenda', new Date('2026-07-22T09:00:00'))
+  const sections = buildAgendaSections(
+    [
+      {
+        id: 'timetracker:5',
+        source: 'timetracker',
+        title: 'certification',
+        start: '2026-07-22T08:00:00',
+        end: '2026-07-22T08:45:00'
+      },
+      {
+        id: 'google:standup',
+        source: 'google',
+        title: 'Standup',
+        start: '2026-07-22T11:10:00',
+        end: '2026-07-22T11:30:00'
+      }
+    ],
+    days
+  )
+
+  assert.deepEqual(
+    sections.flatMap((section) => section.events.map((event) => event.title)),
+    ['Standup']
+  )
+})

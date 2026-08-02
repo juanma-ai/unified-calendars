@@ -188,8 +188,15 @@ export function buildYearHeatmap(events, anchor) {
  * Groups events into chronological day sections for the agenda list. Days with
  * no events are dropped, so the list stays dense.
  */
+// Agenda is a rolling window starting today, so it answers "what is coming up". A tracked
+// session is a record of work already done; the only ones it could ever show are this
+// morning's, and they would push the day's remaining events down the list.
+function isAgendaEvent(event) {
+  return event.source !== 'timetracker'
+}
+
 export function buildAgendaSections(events, days) {
-  const sorted = [...events].sort(byStart)
+  const sorted = events.filter(isAgendaEvent).sort(byStart)
 
   return days
     .map((day) => ({

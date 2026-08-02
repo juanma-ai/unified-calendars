@@ -113,6 +113,11 @@ export function buildAgenda(events, { locale = undefined, now = new Date(), pref
   const normalized = preferences ? normalizePreferences(preferences) : null
   const todayEvents = events
     .filter((event) => {
+      // Tracked sessions are a record of work already done, and the menu bar is a
+      // forward-looking surface. A running session also maps to `end = now`, which would
+      // satisfy the nextEvent test below and put "certification" in the tray title
+      // instead of the next meeting.
+      if (event.source === 'timetracker') return false
       if (event.status === 'cancelled' || !overlapsDay(event, now)) return false
       if (!normalized) return true
       return (

@@ -214,3 +214,36 @@ test('builds a native menu template with agenda rows and actions', () => {
   assert.equal(template[3].toolTip, 'Next event')
   assert.equal(template[4].enabled, true)
 })
+
+test('tracked sessions stay out of the menu bar and never claim the tray title', () => {
+  const now = new Date('2026-07-22T10:45:00+02:00')
+  const agenda = buildAgenda(
+    [
+      {
+        id: 'timetracker:5',
+        source: 'timetracker',
+        title: 'certification',
+        calendarId: 'timetracker:certification',
+        calendarDefaultVisible: true,
+        // A running session ends at "now", which would otherwise satisfy the
+        // `endMs >= nowMs` test that picks the next event.
+        start: '2026-07-22T09:30:00+02:00',
+        end: '2026-07-22T10:45:00+02:00',
+        isRunning: true
+      },
+      {
+        id: 'google:standup',
+        source: 'google',
+        title: 'Standup',
+        calendarId: 'google:work:primary',
+        calendarDefaultVisible: true,
+        start: '2026-07-22T11:10:00+02:00',
+        end: '2026-07-22T11:30:00+02:00'
+      }
+    ],
+    { now }
+  )
+
+  assert.deepEqual(agenda.events.map((event) => event.title), ['Standup'])
+  assert.equal(getTrayTitle(agenda), '25m Standup')
+})
