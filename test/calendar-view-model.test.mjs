@@ -163,3 +163,33 @@ test('quick-hiding a calendar keeps it listed in the sidebar', () => {
   assert.equal(calendar.visible, false)
   assert.deepEqual(filterVisibleEvents(events, preferences, ''), [])
 })
+
+test('a disabled source drops out of every view through one choke point', () => {
+  const tracked = [
+    {
+      source: 'timetracker',
+      calendarId: 'timetracker:certification',
+      calendarName: 'certification',
+      calendarDefaultVisible: true,
+      id: 'timetracker:5',
+      title: 'certification',
+      start: '2026-08-01T10:00:00.000Z',
+      end: '2026-08-01T11:00:00.000Z'
+    },
+    {
+      source: 'google',
+      calendarId: 'google:work:personal',
+      calendarName: 'Personal',
+      calendarDefaultVisible: true,
+      id: 'google:standup',
+      title: 'Standup',
+      start: '2026-08-01T09:00:00.000Z',
+      end: '2026-08-01T09:15:00.000Z'
+    }
+  ]
+
+  assert.equal(filterVisibleEvents(tracked, {}).length, 2, 'enabled unless explicitly off')
+
+  const visible = filterVisibleEvents(tracked, { sourceEnabled: { timetracker: false } })
+  assert.deepEqual(visible.map((event) => event.title), ['Standup'])
+})

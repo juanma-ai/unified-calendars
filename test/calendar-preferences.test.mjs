@@ -64,3 +64,27 @@ test('hides and restores one occurrence or an entire series', () => {
     ['series:google:work:primary:series:weekly-team']
   )
 })
+
+test('a source master switch round-trips and leaves per-calendar visibility intact', () => {
+  const store = createCalendarPreferencesStore(memoryStore())
+
+  store.setCalendarVisibility('timetracker:admin', false)
+  const off = store.setSourceEnabled('timetracker', false)
+  assert.equal(off.sourceEnabled.timetracker, false)
+
+  const on = store.setSourceEnabled('timetracker', true)
+  assert.equal(on.sourceEnabled.timetracker, true)
+  assert.equal(
+    on.calendarVisibility['timetracker:admin'],
+    false,
+    'switching a source off and on must not lose which calendars were hidden'
+  )
+})
+
+test('preferences saved before the master switch existed normalize to enabled', () => {
+  const storage = memoryStore()
+  storage.set('calendarPreferences', { calendarColors: {}, hiddenEvents: [] })
+  const store = createCalendarPreferencesStore(storage)
+
+  assert.deepEqual(store.get().sourceEnabled, {})
+})

@@ -6,8 +6,19 @@ function normalizedPreferences(preferences = {}) {
     calendarSidebarVisibility: preferences.calendarSidebarVisibility ?? {},
     calendarVisibility: preferences.calendarVisibility ?? {},
     hiddenCalendars: preferences.hiddenCalendars ?? [],
-    hiddenEvents: preferences.hiddenEvents ?? []
+    hiddenEvents: preferences.hiddenEvents ?? [],
+    sourceEnabled: preferences.sourceEnabled ?? {}
   }
+}
+
+/**
+ * Whole-source master switch. Kept separate from per-calendar visibility so switching a
+ * source off and back on restores which of its calendars were individually hidden, and
+ * applied here so every view obeys it without per-view work.
+ */
+export function isSourceEnabled(preferenceValue, source) {
+  const sourceEnabled = preferenceValue?.sourceEnabled ?? {}
+  return sourceEnabled[source] !== false
 }
 
 function isCalendarVisible(event, preferences) {
@@ -81,6 +92,7 @@ export function filterVisibleEvents(events, preferenceValue, searchQuery = '') {
   const query = searchQuery.trim().toLocaleLowerCase()
 
   return events.filter((event) => {
+    if (!isSourceEnabled(preferences, event.source)) return false
     if (!isCalendarInSidebar(event, preferences)) return false
     if (!isCalendarVisible(event, preferences)) return false
     if (hiddenEvents.has(`occurrence:${event.id}`)) return false

@@ -17,7 +17,8 @@ import {
   restoreHiddenCalendarEvent,
   setCalendarColor,
   setCalendarSidebarVisibility,
-  setCalendarVisibility
+  setCalendarVisibility,
+  setSourceEnabled
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
 import { createEventTimeUpdater } from './eventMutations.js'
@@ -150,6 +151,11 @@ export function registerIpcHandlers() {
   })
   ipcMain.handle('preferences:setCalendarVisibility', (_event, calendarId, visible) => {
     const preferences = setCalendarVisibility(calendarId, Boolean(visible))
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+  ipcMain.handle('preferences:setSourceEnabled', (_event, source, enabled) => {
+    const preferences = setSourceEnabled(String(source), Boolean(enabled))
     rescheduleEventNotifications(preferences)
     return preferences
   })

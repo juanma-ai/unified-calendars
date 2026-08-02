@@ -6,7 +6,8 @@ const DEFAULT_PREFERENCES = {
   calendarSidebarVisibility: {},
   calendarVisibility: {},
   hiddenCalendars: [],
-  hiddenEvents: []
+  hiddenEvents: [],
+  sourceEnabled: {}
 }
 
 function normalize(value = {}) {
@@ -15,7 +16,10 @@ function normalize(value = {}) {
     calendarSidebarVisibility: value.calendarSidebarVisibility ?? {},
     calendarVisibility: value.calendarVisibility ?? {},
     hiddenCalendars: value.hiddenCalendars ?? [],
-    hiddenEvents: value.hiddenEvents ?? []
+    hiddenEvents: value.hiddenEvents ?? [],
+    // Whole-source master switch, distinct from per-calendar visibility: turning a
+    // source off must not lose which of its calendars were individually hidden.
+    sourceEnabled: value.sourceEnabled ?? {}
   }
 }
 
@@ -47,6 +51,13 @@ export function createCalendarPreferencesStore(storage) {
         preferences.calendarSidebarVisibility[calendarId] = true
       }
       preferences.calendarVisibility[calendarId] = visible
+      save(preferences)
+      return get()
+    },
+
+    setSourceEnabled(source, enabled) {
+      const preferences = get()
+      preferences.sourceEnabled[source] = enabled
       save(preferences)
       return get()
     },
@@ -95,5 +106,7 @@ export const setCalendarSidebarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarSidebarVisibility(calendarId, visible)
 export const setCalendarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarVisibility(calendarId, visible)
+export const setSourceEnabled = (source, enabled) =>
+  getDefaultStore().setSourceEnabled(source, enabled)
 export const hideCalendarEvent = (event) => getDefaultStore().hideEvent(event)
 export const restoreHiddenCalendarEvent = (key) => getDefaultStore().restoreHiddenEvent(key)
