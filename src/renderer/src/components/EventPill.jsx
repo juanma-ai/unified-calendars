@@ -3,6 +3,7 @@ import { external } from '@wordpress/icons'
 import { format } from 'date-fns'
 import { getEventColor } from '../calendarViewModel.js'
 import { getEventPalette } from '../eventColors.js'
+import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
 
 function getShortAssigneeName(assignee) {
   if (assignee.isMe) return 'You'
@@ -73,22 +74,23 @@ export function EventPill({
   const trelloMetaLabel = trelloAssigneeLabel
     ? `${trelloAssigneeLabel} - ${showTime ? format(new Date(event.start), 'HH:mm') : trelloDueLabel}`
     : null
+  const isTracked = event.source === 'timetracker'
   const actionLabel = [
     event.title,
     trelloAssigneeLabel ? `Assigned: ${trelloAssigneeLabel}` : null,
     trelloDueLabel ? `Due: ${trelloDueLabel}` : null,
-    'Open event actions'
+    isTracked ? 'Open tracked session details' : 'Open event actions'
   ].filter(Boolean).join('. ')
 
   return (
     <Dropdown
-      contentClassName="event-actions-popover"
+      contentClassName={isTracked ? 'tracked-session-popover' : 'event-actions-popover'}
       popoverProps={{ placement: 'right-start' }}
-      renderToggle={({ onToggle }) => (
+      renderToggle={({ isOpen, onToggle }) => (
         <Button
           className={`event-pill${isRow ? ' is-row' : ''}${showTime && !isRow ? ' is-timed' : ''}${
             event.assignedToMe ? ' is-assigned-to-me' : ''
-          }`}
+          }${isTracked && isOpen ? ' is-session-selected' : ''}`}
           aria-label={actionLabel}
           onClick={onToggle}
           style={isRow ? undefined : { backgroundColor: palette.background, color: palette.text }}
@@ -105,24 +107,19 @@ export function EventPill({
           {trelloMetaLabel && <span className="event-pill__meta">{trelloMetaLabel}</span>}
         </Button>
       )}
-      renderContent={({ onClose }) => (
+      renderContent={({ onClose }) => (isTracked ? (
+        <TrackedSessionPopover
+          color={displayColor}
+          event={event}
+          onClose={onClose}
+          onHideEvent={onHideEvent}
+        />
+      ) : (
         <MenuGroup label={event.title}>
           {event.source === 'trello' && trelloAssigneeLabel && (
             <div className="event-actions-popover__meta">
               <span>Assigned: {getFullTrelloAssigneeLabel(event)}</span>
               <span>Due: {trelloDueLabel}</span>
-            </div>
-          )}
-          {event.source === 'timetracker' && event.notes?.length > 0 && (
-            <div className="event-actions-popover__meta event-actions-popover__notes">
-              {event.notes.map((note, index) => (
-                <span key={`${note.ts}:${index}`}>
-                  <time dateTime={note.ts}>{format(new Date(note.ts), 'HH:mm')}</time>{' '}
-                  {/* The tracker stores notes verbatim, so markdown is common. Showing it
-                      literally is the safer default than guessing at a renderer. */}
-                  {note.text}
-                </span>
-              ))}
             </div>
           )}
           {event.url && (
@@ -155,7 +152,7 @@ export function EventPill({
             </MenuItem>
           )}
         </MenuGroup>
-      )}
+      ))}
     />
   )
 }
