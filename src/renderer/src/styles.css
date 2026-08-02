@@ -1295,18 +1295,6 @@ input {
   line-height: 1.4;
 }
 
-/* Tracked session notes arrive verbatim from the tracker, newlines and all. */
-.event-actions-popover__notes span {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.event-actions-popover__notes time {
-  color: #8d8d8d;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-}
-
 .settings-calendar-list__intro {
   margin: 0 0 16px;
   color: #50575e;
@@ -1489,4 +1477,178 @@ input {
   .calendar-sidebar__tracked-dot {
     animation: none;
   }
+}
+
+/* Tracked session popover (issue #8) --------------------------------------- */
+
+/* A tracked session opens a read-only card rather than the standard event menu, so the
+   popover surface itself is styled here instead of inheriting the menu chrome. */
+.tracked-session-popover .components-popover__content {
+  width: 296px;
+  border: 1px solid #e4e4e4;
+  border-radius: 8px;
+  box-shadow: 0 5px 50px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tracked-session {
+  padding: 16px;
+  color: #1e1e1e;
+}
+
+.tracked-session__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tracked-session__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 2px;
+}
+
+.tracked-session__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.tracked-session__project {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.tracked-session__range {
+  margin: 0;
+  color: #707070;
+  font-size: 12px;
+}
+
+.components-button.tracked-session__close {
+  flex: none;
+  color: #707070;
+}
+
+.tracked-session__running {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 10px 0 0;
+  padding: 4px 8px;
+  border-radius: 2px;
+  background: #e9f4ee;
+  color: #00875a;
+  font-size: 12px;
+}
+
+.tracked-session__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: tracked-session-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tracked-session-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tracked-session__pulse {
+    animation: none;
+  }
+}
+
+.tracked-session__section,
+.tracked-session__footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #ededed;
+}
+
+.tracked-session__label {
+  margin: 0 0 8px;
+  color: #707070;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.tracked-session__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tracked-session__note {
+  display: flex;
+  gap: 8px;
+}
+
+.tracked-session__note-time {
+  flex: none;
+  padding-top: 1px;
+  color: #8d8d8d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* Notes arrive verbatim from the tracker — newlines, URLs and markdown included. */
+.tracked-session__note-text {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.tracked-session__todo {
+  margin-right: 4px;
+  color: #8d8d8d;
+}
+
+.tracked-session__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.components-button.tracked-session__hide {
+  height: auto;
+  font-size: 11px;
+}
+
+.tracked-session__readonly {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #8d8d8d;
+  font-size: 11px;
+}
+
+.tracked-session__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The bar stays visibly selected while its card is open. */
+.components-button.event-pill.is-session-selected {
+  box-shadow: 0 0 0 2px rgba(56, 88, 233, 0.5);
 }
