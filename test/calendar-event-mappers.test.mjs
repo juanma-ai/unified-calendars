@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapGoogleEvent, mapTrelloCard } from '../src/main/sources/calendarEventMappers.js'
+import { mapGoogleEvent, mapTrackedEntry, mapTrelloCard } from '../src/main/sources/calendarEventMappers.js'
 
 test('Google events retain calendar and recurring-series identity', () => {
   const event = mapGoogleEvent(
@@ -71,4 +71,41 @@ test('Trello cards include assignee metadata and assigned-to-me state', () => {
     { id: 'member-me', name: 'JuanMa Garrido', initials: 'JG', username: 'juanma', isMe: true },
     { id: 'member-ana', name: 'Ana Lopez', initials: 'AL', username: 'ana', isMe: false }
   ])
+})
+
+test('Tracked entries carry provider ids and a running flag, never a URL to open', () => {
+  const start = Math.floor(Date.UTC(2026, 6, 26, 10, 5, 0) / 1000)
+  const end = Math.floor(Date.UTC(2026, 6, 26, 11, 52, 0) / 1000)
+
+  const event = mapTrackedEntry(
+    { id: 4, project: 'certification', start, end },
+    [{ entry_id: 4, ts: start + 60, text: 'Working on Hooks' }],
+    { now: Date.UTC(2026, 6, 26, 12, 0, 0) }
+  )
+
+  assert.equal(event.source, 'timetracker')
+  assert.equal(event.calendarId, 'timetracker:certification')
+  assert.equal(event.calendarName, 'certification')
+  assert.equal(event.calendarDefaultVisible, true)
+  assert.equal(event.id, 'timetracker:4')
+  assert.equal(event.providerCalendarId, 'certification', 'writes would target the project name')
+  assert.equal(event.providerEventId, '4', 'never re-parse the composite id')
+  assert.equal(event.seriesId, null)
+  assert.equal(event.title, 'certification')
+  assert.equal(event.allDay, false)
+  assert.equal(event.isRunning, false)
+  assert.equal(event.url, undefined, 'a tracked session has nowhere to open')
+  assert.deepEqual(event.notes, [
+    { ts: '2026-07-26T10:06:00.000Z', text: 'Working on Hooks' }
+  ])
+})
+
+test('A running entry with a start in the future never produces a negative duration', () => {
+  const now = Date.UTC(2026, 6, 26, 12, 0, 0)
+  const start = Math.floor(Date.UTC(2026, 6, 26, 12, 30, 0) / 1000)
+
+  const event = mapTrackedEntry({ id: 8, project: 'admin', start, end: null }, [], { now })
+
+  assert.equal(event.isRunning, true)
+  assert.ok(new Date(event.end) >= new Date(event.start))
 })

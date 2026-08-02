@@ -2,6 +2,7 @@ import Store from 'electron-store'
 import { fetchGoogleEvents } from './sources/google.js'
 import { fetchTrelloEvents } from './sources/trello.js'
 import { fetchRemindersEvents } from './sources/reminders.js'
+import { fetchTimetrackerEvents } from './sources/timetracker.js'
 import { createSourceRangeCache } from './sourceRangeCache.js'
 
 const store = new Store({ name: 'calendar-personal-app' })
@@ -9,13 +10,16 @@ const store = new Store({ name: 'calendar-personal-app' })
 const TTL_MS = {
   google: 5 * 60 * 1000,
   trello: 7 * 60 * 1000,
-  reminders: 3 * 60 * 1000
+  reminders: 3 * 60 * 1000,
+  // Short, because a running session's end is "now at fetch time" and stales quickly.
+  timetracker: 30 * 1000
 }
 
 const FETCHERS = {
   google: fetchGoogleEvents,
   trello: fetchTrelloEvents,
-  reminders: fetchRemindersEvents
+  reminders: fetchRemindersEvents,
+  timetracker: fetchTimetrackerEvents
 }
 
 const cache = createSourceRangeCache()

@@ -1,3 +1,7 @@
+import { projectColor } from './timetrackerProjects.js'
+
+const SECONDS_TO_MS = 1000
+
 export function mapGoogleEvent(item, accountLabel, calendar) {
   const calendarId = `google:${accountLabel}:${calendar.id}`
   const allDay = Boolean(item.start?.date && !item.start?.dateTime)
@@ -66,5 +70,42 @@ export function mapTrelloCard(card, board, options = {}) {
     assignees,
     assignedToMe: Boolean(currentMemberId && memberIds.includes(currentMemberId)),
     raw: card
+  }
+}
+
+/**
+ * A tracked session from the time tracker's SQLite file. Timestamps arrive as Unix
+ * seconds; an entry with no `end` is still running, so it is closed at `now` and flagged
+ * for the renderer to keep growing between refreshes.
+ */
+export function mapTrackedEntry(entry, notes = [], options = {}) {
+  const nowMs = options.now ?? Date.now()
+  const isRunning = entry.end === null || entry.end === undefined
+  const startMs = entry.start * SECONDS_TO_MS
+  // A clock change can leave a running entry starting "after" now; never emit a
+  // negative-length event, which timedPosition would have to paper over.
+  const endMs = isRunning ? Math.max(nowMs, startMs) : entry.end * SECONDS_TO_MS
+
+  return {
+    source: 'timetracker',
+    calendarId: `timetracker:${entry.project}`,
+    calendarName: entry.project,
+    calendarDefaultColor: projectColor(entry.project),
+    calendarDefaultVisible: true,
+    id: `timetracker:${entry.id}`,
+    providerCalendarId: entry.project,
+    providerEventId: String(entry.id),
+    seriesId: null,
+    title: entry.project,
+    start: new Date(startMs).toISOString(),
+    end: new Date(endMs).toISOString(),
+    allDay: false,
+    status: 'confirmed',
+    isRunning,
+    notes: notes.map((note) => ({
+      ts: new Date(note.ts * SECONDS_TO_MS).toISOString(),
+      text: note.text
+    })),
+    raw: entry
   }
 }
