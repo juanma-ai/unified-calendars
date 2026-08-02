@@ -8,7 +8,7 @@ import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
-import { buildCalendars, filterVisibleEvents } from './calendarViewModel.js'
+import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendarViewModel.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
@@ -90,6 +90,13 @@ export function App() {
     () => filterVisibleEvents(events, preferences, searchQuery),
     [events, preferences, searchQuery]
   )
+  // Every tracked session in the range, before per-project hiding and before the search
+  // query: the sidebar shows each project's own total whether or not it is on the
+  // calendar, and a search should not make those totals jump around.
+  const trackedEvents = useMemo(
+    () => events.filter((event) => event.source === 'timetracker'),
+    [events]
+  )
 
   const refresh = useCallback(async () => {
     const result = await refreshCalendar(window.calendarAPI, range.start, range.end)
@@ -157,6 +164,10 @@ export function App() {
 
   const handleCalendarSidebarVisibility = useCallback((calendarId, visible) => {
     window.calendarAPI.setCalendarSidebarVisibility(calendarId, visible).then(setPreferences)
+  }, [])
+
+  const handleSourceEnabled = useCallback((source, enabled) => {
+    window.calendarAPI.setSourceEnabled(source, enabled).then(setPreferences)
   }, [])
 
   const handleCalendarVisibility = useCallback((calendarId, visible) => {
@@ -277,15 +288,20 @@ export function App() {
       />
       <div className="app">
         <CalendarSidebar
+          anchorDate={anchorDate}
           calendars={sidebarCalendars}
           calendarCountBySource={calendarCountBySource}
+          calendarView={calendarView}
           hiddenEventCount={preferences.hiddenEvents.length}
           onColorChange={handleCalendarColor}
           onOpenSettings={openSettings}
+          onSourceEnabledChange={handleSourceEnabled}
           onVisibilityChange={handleCalendarVisibility}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           statuses={statuses}
+          trackedEnabled={isSourceEnabled(preferences, 'timetracker')}
+          trackedEvents={trackedEvents}
         />
         <main className="calendar-main">
           {actionError && (

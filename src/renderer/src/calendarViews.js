@@ -96,6 +96,30 @@ export function formatViewLabel(view, anchor) {
   }
 }
 
+/**
+ * Label for the sidebar's tracked-time total. The total covers whatever range is on
+ * screen, so the label has to name that range rather than saying "this week" forever.
+ * It lives here with the rest of the per-view date work, not in the sidebar.
+ *
+ * The day view says "today" only when the anchor really is today; stepping back a day
+ * would otherwise put yesterday's total under a label claiming it was today's.
+ */
+export function formatTrackedRangeLabel(view, anchor, now = new Date()) {
+  switch (view) {
+    case 'day':
+      return isSameDay(anchor, now) ? 'Tracked today' : `Tracked on ${format(anchor, 'EEE, MMM d')}`
+    case 'month':
+      return `Tracked in ${format(anchor, 'MMMM')}`
+    case 'year':
+      return `Tracked in ${format(anchor, 'yyyy')}`
+    case 'agenda':
+      return 'Tracked in range'
+    case 'week':
+    default:
+      return 'Tracked this week'
+  }
+}
+
 export function navigateView(view, anchor, direction) {
   if (direction === 'today') return new Date()
 

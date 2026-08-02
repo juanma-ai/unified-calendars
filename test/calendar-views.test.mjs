@@ -6,6 +6,7 @@ import {
   buildAgendaSections,
   buildMonthCells,
   buildYearHeatmap,
+  formatTrackedRangeLabel,
   formatViewLabel,
   getViewDays,
   getViewRange,
@@ -200,4 +201,18 @@ test('agenda sections omit tracked sessions, which record past work', () => {
     sections.flatMap((section) => section.events.map((event) => event.title)),
     ['Standup']
   )
+})
+
+test('formatTrackedRangeLabel names the range the totals cover', () => {
+  assert.equal(formatTrackedRangeLabel('day', anchor, anchor), 'Tracked today')
+  assert.equal(formatTrackedRangeLabel('week', anchor, anchor), 'Tracked this week')
+  assert.equal(formatTrackedRangeLabel('month', anchor, anchor), 'Tracked in July')
+  assert.equal(formatTrackedRangeLabel('year', anchor, anchor), 'Tracked in 2026')
+  assert.equal(formatTrackedRangeLabel('agenda', anchor, anchor), 'Tracked in range')
+})
+
+test('formatTrackedRangeLabel only says "today" when the day view is on today', () => {
+  const yesterday = new Date(2026, 6, 29, 12, 0)
+
+  assert.equal(formatTrackedRangeLabel('day', yesterday, anchor), 'Tracked on Wed, Jul 29')
 })
