@@ -6,6 +6,7 @@ import { CalendarGrid } from './components/CalendarGrid.jsx'
 import { CalendarSidebar } from './components/CalendarSidebar.jsx'
 import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
+import { getIpcErrorMessage } from './ipcErrors.js'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents } from './calendarViewModel.js'
@@ -23,13 +24,6 @@ const DEFAULT_PREFERENCES = {
 function readStoredView() {
   const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
   return isCalendarView(stored) ? stored : DEFAULT_VIEW
-}
-
-// Electron wraps handler errors as "Error invoking remote method '…': Error: <message>".
-function getIpcErrorMessage(error) {
-  const message = error?.message ?? ''
-  const match = /Error:\s*(.*)$/.exec(message)
-  return (match?.[1] || message || 'Something went wrong').trim()
 }
 
 export function App() {
@@ -257,6 +251,7 @@ export function App() {
           onDisconnectGoogle={handleDisconnectGoogle}
           onReconnectGoogle={handleReconnectGoogle}
           onRestoreHiddenEvent={handleRestoreHiddenEvent}
+          onSourceDataChanged={refresh}
           onVisibilityChange={handleCalendarSidebarVisibility}
           statuses={statuses}
         />

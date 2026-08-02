@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import {
   getAvailableCalendars,
   getSourceStatus,
@@ -10,6 +10,7 @@ import { config } from './config.js'
 import { disconnectGoogleAccount, startOAuthFlow, updateGoogleEventTime } from './sources/google.js'
 import { updateReminderDue } from './sources/reminders.js'
 import { updateTrelloCardDue } from './sources/trello.js'
+import { readTimetrackerStats, validateDataDir } from './sources/timetracker.js'
 import { getGoogleAccounts } from './tokenStore.js'
 import {
   getCalendarPreferences,
@@ -18,7 +19,8 @@ import {
   setCalendarColor,
   setCalendarSidebarVisibility,
   setCalendarVisibility,
-  setSourceEnabled
+  setSourceEnabled,
+  setTimetrackerDataDir
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
 import { createEventTimeUpdater } from './eventMutations.js'
@@ -137,6 +139,26 @@ export function registerIpcHandlers() {
       throw new Error('Unsupported external URL protocol')
     }
     return shell.openExternal(url.toString())
+  })
+
+  ipcMain.handle('timetracker:getStats', () => readTimetrackerStats())
+
+  // The tracker keeps writing to its own directory; this only tells the calendar where to
+  // read. Validating before saving means a mis-picked folder never becomes the stored one.
+  ipcMain.handle('timetracker:chooseDataDir', async () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    const { canceled, filePaths } = await (win
+      ? dialog.showOpenDialog(win, { properties: ['openDirectory'] })
+      : dialog.showOpenDialog({ properties: ['openDirectory'] }))
+
+    if (canceled || filePaths.length === 0) return { cancelled: true }
+
+    const [dataDir] = filePaths
+    await validateDataDir(dataDir)
+    setTimetrackerDataDir(dataDir)
+    invalidateSourceCache('timetracker')
+
+    return { cancelled: false, stats: await readTimetrackerStats() }
   })
 
   ipcMain.handle('preferences:get', () => getCalendarPreferences())

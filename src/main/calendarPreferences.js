@@ -7,7 +7,8 @@ const DEFAULT_PREFERENCES = {
   calendarVisibility: {},
   hiddenCalendars: [],
   hiddenEvents: [],
-  sourceEnabled: {}
+  sourceEnabled: {},
+  timetrackerDataDir: null
 }
 
 function normalize(value = {}) {
@@ -19,7 +20,10 @@ function normalize(value = {}) {
     hiddenEvents: value.hiddenEvents ?? [],
     // Whole-source master switch, distinct from per-calendar visibility: turning a
     // source off must not lose which of its calendars were individually hidden.
-    sourceEnabled: value.sourceEnabled ?? {}
+    sourceEnabled: value.sourceEnabled ?? {},
+    // Where the calendar *reads* the tracker's database from. The tracker keeps writing to
+    // its own directory; null means fall back to TIMETRACKER_DIR then ~/.timetracker.
+    timetrackerDataDir: value.timetrackerDataDir ?? null
   }
 }
 
@@ -58,6 +62,13 @@ export function createCalendarPreferencesStore(storage) {
     setSourceEnabled(source, enabled) {
       const preferences = get()
       preferences.sourceEnabled[source] = enabled
+      save(preferences)
+      return get()
+    },
+
+    setTimetrackerDataDir(dataDir) {
+      const preferences = get()
+      preferences.timetrackerDataDir = dataDir || null
       save(preferences)
       return get()
     },
@@ -108,5 +119,7 @@ export const setCalendarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarVisibility(calendarId, visible)
 export const setSourceEnabled = (source, enabled) =>
   getDefaultStore().setSourceEnabled(source, enabled)
+export const setTimetrackerDataDir = (dataDir) =>
+  getDefaultStore().setTimetrackerDataDir(dataDir)
 export const hideCalendarEvent = (event) => getDefaultStore().hideEvent(event)
 export const restoreHiddenCalendarEvent = (key) => getDefaultStore().restoreHiddenEvent(key)

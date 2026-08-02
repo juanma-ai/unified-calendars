@@ -1312,3 +1312,35 @@ input {
   color: #50575e;
   font-size: 14px;
 }
+
+/* --- Issue #11: Settings → Connections, Time Tracker card --------------------
+   Values taken from the split-lane mockup (`Time Tracker source.dc.html`). The
+   Detected badge is deliberately quieter than the generic Connected badge: the
+   tracker is discovered, not connected. */
+
+.settings-badge.is-detected {
+  padding: 0 6px;
+  color: #00875a;
+  background: #e9f4ee;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.settings-timetracker__path {
+  padding: 0;
+  background: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.settings-timetracker__stats {
+  color: #707070;
+  font-size: 12px;
+}
+
+.settings-timetracker__note {
+  color: #8d8d8d;
+  font-size: 12px;
+}
