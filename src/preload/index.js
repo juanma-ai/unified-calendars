@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   connectGoogleAccount: () => ipcRenderer.invoke('accounts:connectGoogle'),
   disconnectGoogleAccount: (accountId) => ipcRenderer.invoke('accounts:disconnectGoogle', accountId),
   openExternal: (url) => ipcRenderer.invoke('calendar:openExternal', url),
+  getTimetrackerStats: () => ipcRenderer.invoke('timetracker:getStats'),
+  chooseTimetrackerFolder: () => ipcRenderer.invoke('timetracker:chooseDataDir'),
   getPreferences: () => ipcRenderer.invoke('preferences:get'),
   setCalendarColor: (calendarId, color) =>
     ipcRenderer.invoke('preferences:setCalendarColor', calendarId, color),

@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
-import { access, readFile } from 'node:fs/promises'
+import { access, constants as fsConstants, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { endOfWeek, startOfWeek } from 'date-fns'
+import { getCalendarPreferences } from '../calendarPreferences.js'
 import { mapTrackedEntry } from './calendarEventMappers.js'
 import { parseProjectsFile, projectColor } from './timetrackerProjects.js'
 
@@ -9,15 +11,44 @@ import { parseProjectsFile, projectColor } from './timetrackerProjects.js'
 // process. Shelling out to the system sqlite3 keeps this dependency-free and read-only,
 // the same shape as the Reminders source spawning its native helper.
 const SQLITE_PATH = '/usr/bin/sqlite3'
-const DB_FILE = 'timetracker.db'
+export const DB_FILE = 'timetracker.db'
 const PROJECTS_FILE = 'projects.txt'
 
+// Matches WEEK_OPTIONS in the renderer's calendarDates.js. Main does not import from the
+// renderer, and this is the only week boundary the main process needs.
+const WEEK_OPTIONS = { weekStartsOn: 1 }
+
 /**
- * Single point of truth for where the tracker's data lives. Issue #11 adds a stored
- * preference as a new first branch here rather than reworking the callers.
+ * Single point of truth for where the tracker's data lives: the folder picked in Settings,
+ * then the env var the tracker itself honours, then the default. Nothing else in the app
+ * builds a tracker path.
  */
-export function resolveDataDir() {
-  return process.env.TIMETRACKER_DIR || join(homedir(), '.timetracker')
+export function resolveDataDir({
+  readPreferences = getCalendarPreferences,
+  env = process.env
+} = {}) {
+  return (
+    readPreferences().timetrackerDataDir || env.TIMETRACKER_DIR || join(homedir(), '.timetracker')
+  )
+}
+
+/**
+ * A folder is only usable if we can actually read a database out of it. Picking the parent
+ * of the real directory is the easy mistake, so the message names what was missing and where.
+ */
+export async function validateDataDir(dataDir) {
+  if (!dataDir) throw new Error('No folder selected')
+
+  const dbPath = join(dataDir, DB_FILE)
+  try {
+    await access(dbPath, fsConstants.R_OK)
+  } catch {
+    throw new Error(
+      `No readable ${DB_FILE} in ${dataDir}. Pick the folder the tracker writes to.`
+    )
+  }
+
+  return dbPath
 }
 
 function toSeconds(ms) {
@@ -178,15 +209,57 @@ async function readProjectsFile(path) {
   }
 }
 
-export async function fetchTimetrackerEvents(rangeStart, rangeEnd) {
-  const dataDir = resolveDataDir()
-  const dbPath = join(dataDir, DB_FILE)
+export async function fetchTimetrackerEvents(rangeStart, rangeEnd, { dataDir } = {}) {
+  const dir = dataDir ?? resolveDataDir()
+  const dbPath = join(dir, DB_FILE)
 
   const source = createTimetrackerSource({
     runQuery: createSqliteRunner(dbPath),
-    readProjects: () => readProjectsFile(join(dataDir, PROJECTS_FILE)),
+    readProjects: () => readProjectsFile(join(dir, PROJECTS_FILE)),
     detect: () => fileExists(dbPath)
   })
 
   return source(rangeStart, rangeEnd)
+}
+
+/**
+ * What the Settings card needs to describe the connection: where it reads from, whether a
+ * database is there, and how much is in it this week. It reads the current week explicitly
+ * rather than reusing whatever range the grid happens to be showing, because the card says
+ * "this week" and the grid can be on a day, a month or a year.
+ *
+ * This deliberately bypasses the aggregator cache: the card is opened on demand and must
+ * reflect the folder that was just picked.
+ */
+export async function readTimetrackerStats({
+  now = () => Date.now(),
+  resolveDir = resolveDataDir,
+  fetchEvents = fetchTimetrackerEvents
+} = {}) {
+  const dataDir = resolveDir()
+  const anchor = new Date(now())
+  const { events, calendars, statuses } = await fetchEvents(
+    startOfWeek(anchor, WEEK_OPTIONS).toISOString(),
+    endOfWeek(anchor, WEEK_OPTIONS).toISOString(),
+    // Pass the directory we just resolved so the card cannot describe one folder while
+    // reporting counts from another.
+    { dataDir }
+  )
+  const status = statuses[0] ?? {}
+  const dbPath = join(dataDir, DB_FILE)
+  const home = homedir()
+
+  return {
+    dataDir,
+    dbPath,
+    // The card shows the path inline, and `~/.timetracker/timetracker.db` fits where
+    // `/Users/someone/.timetracker/timetracker.db` wraps.
+    displayPath: dbPath.startsWith(`${home}/`) ? `~${dbPath.slice(home.length)}` : dbPath,
+    detected: status.detected !== false,
+    // `calendars` already merges projects.txt with the projects named by actual entries, so
+    // this is the same project count the sidebar lists.
+    projectCount: calendars.length,
+    sessionCount: events.length,
+    lastError: status.ok === false ? (status.lastError ?? 'Could not read the tracker database') : null
+  }
 }

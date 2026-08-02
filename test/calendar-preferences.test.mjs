@@ -88,3 +88,17 @@ test('preferences saved before the master switch existed normalize to enabled', 
 
   assert.deepEqual(store.get().sourceEnabled, {})
 })
+
+test('the time tracker data folder round-trips and can be cleared', () => {
+  const preferences = createCalendarPreferencesStore(memoryStore())
+
+  assert.equal(preferences.get().timetrackerDataDir, null)
+
+  preferences.setTimetrackerDataDir('/Volumes/work/tracker')
+  assert.equal(preferences.get().timetrackerDataDir, '/Volumes/work/tracker')
+
+  // Clearing has to fall all the way back to null so resolveDataDir reaches TIMETRACKER_DIR
+  // and then the default, rather than resolving an empty string.
+  preferences.setTimetrackerDataDir('')
+  assert.equal(preferences.get().timetrackerDataDir, null)
+})

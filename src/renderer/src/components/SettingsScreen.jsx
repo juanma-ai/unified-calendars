@@ -7,11 +7,13 @@ import {
   FlexBlock,
   FlexItem,
   CheckboxControl,
+  Notice,
   SearchControl,
   TabPanel
 } from '@wordpress/components'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
+import { getIpcErrorMessage } from '../ipcErrors.js'
 
 const SOURCE_NAMES = {
   google: 'Google Calendar',
@@ -20,10 +22,10 @@ const SOURCE_NAMES = {
   timetracker: 'Time Tracker'
 }
 
-function ConnectionBadge({ ok }) {
+function ConnectionBadge({ ok, okLabel = 'Connected', okModifier = 'is-ok' }) {
   return (
-    <span className={`settings-badge ${ok ? 'is-ok' : 'is-error'}`}>
-      {ok ? 'Connected' : 'Needs attention'}
+    <span className={`settings-badge ${ok ? okModifier : 'is-error'}`}>
+      {ok ? okLabel : 'Needs attention'}
     </span>
   )
 }
@@ -138,12 +140,114 @@ function ConnectionCard({ source, statuses }) {
         {source === 'reminders' && (
           <p>Access is controlled by macOS in Privacy &amp; Security → Reminders.</p>
         )}
-        {source === 'timetracker' && (
-          <p>
-            Reads <code>~/.timetracker/timetracker.db</code> — nothing to connect.
-            {!connected && ' No tracker database was found there.'}
-          </p>
+      </CardBody>
+    </Card>
+  )
+}
+
+function pluralize(count, noun) {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/**
+ * The time tracker has nothing to authenticate, so its card explains where the data comes
+ * from instead of offering a Connect button. The stats come from `timetracker:getStats`
+ * rather than the events already in the renderer: those cover whatever range the grid is
+ * showing (a day, a month, a year), and this line says "this week".
+ */
+function TimeTrackerCard({ statuses, onSourceDataChanged }) {
+  const status = statuses.find(({ source }) => source === 'timetracker')
+  const [stats, setStats] = useState(null)
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  // Reading the stats spawns sqlite3, so it can still be in flight when the user leaves
+  // Settings again.
+  useEffect(() => {
+    let active = true
+
+    window.calendarAPI
+      .getTimetrackerStats()
+      .then((result) => active && setStats(result))
+      .catch((err) => active && setError(getIpcErrorMessage(err)))
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // A missing database is not a failure — the sidebar stays quiet about it — but it must
+  // not read as Detected here. Once the stats have loaded they are the fresher answer:
+  // they reflect the folder that was just picked, before the grid has refetched.
+  const detected = stats
+    ? stats.detected && !stats.lastError
+    : Boolean(status) && status.ok !== false && status.detected !== false
+
+  const handleChangeFolder = () => {
+    setBusy(true)
+    setError(null)
+    window.calendarAPI
+      .chooseTimetrackerFolder()
+      .then((result) => {
+        if (result?.cancelled) return
+        setStats(result.stats)
+        // The main process already invalidated the source cache; this repopulates the grid
+        // from it so the new folder's sessions appear without a restart.
+        onSourceDataChanged?.()
+      })
+      .catch((err) => setError(getIpcErrorMessage(err)))
+      .finally(() => setBusy(false))
+  }
+
+  return (
+    <Card className="settings-card">
+      <CardHeader>
+        <Flex>
+          <FlexBlock>
+            <h2>{SOURCE_NAMES.timetracker}</h2>
+          </FlexBlock>
+          <FlexItem>
+            <ConnectionBadge ok={detected} okLabel="Detected" okModifier="is-detected" />
+          </FlexItem>
+        </Flex>
+      </CardHeader>
+      <CardBody>
+        {error && (
+          <Notice status="error" isDismissible onRemove={() => setError(null)}>
+            {error}
+          </Notice>
         )}
+        <Flex align="flex-start" gap={4}>
+          <FlexBlock>
+            <p>
+              Reads{' '}
+              <code className="settings-timetracker__path">
+                {stats?.displayPath ?? '~/.timetracker/timetracker.db'}
+              </code>{' '}
+              — nothing to connect.
+              {!detected && ' No tracker database was found there.'}
+            </p>
+            {detected && stats && (
+              <p className="settings-timetracker__stats">
+                {pluralize(stats.projectCount, 'project')} ·{' '}
+                {pluralize(stats.sessionCount, 'session')} this week
+                {status?.lastSyncedAt
+                  ? ` · last read ${format(new Date(status.lastSyncedAt), 'HH:mm')}`
+                  : ''}
+              </p>
+            )}
+            {stats?.lastError && <p className="settings-timetracker__stats">{stats.lastError}</p>}
+            <p className="settings-timetracker__note">
+              The tracker keeps writing to its own folder. This only changes where the calendar
+              reads from.
+            </p>
+          </FlexBlock>
+          <FlexItem>
+            <Button variant="secondary" onClick={handleChangeFolder} disabled={busy}>
+              Change folder
+            </Button>
+          </FlexItem>
+        </Flex>
       </CardBody>
     </Card>
   )
@@ -281,6 +385,7 @@ export function SettingsScreen({
   onDisconnectGoogle,
   onReconnectGoogle,
   onRestoreHiddenEvent,
+  onSourceDataChanged,
   onVisibilityChange,
   statuses
 }) {
@@ -321,9 +426,10 @@ export function SettingsScreen({
                 onReconnect={onReconnectGoogle}
                 statuses={statuses}
               />
-              {['trello', 'reminders', 'timetracker'].map((source) => (
+              {['trello', 'reminders'].map((source) => (
                 <ConnectionCard key={source} source={source} statuses={statuses} />
               ))}
+              <TimeTrackerCard statuses={statuses} onSourceDataChanged={onSourceDataChanged} />
             </div>
           )
         }}
