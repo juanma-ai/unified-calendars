@@ -1686,6 +1686,22 @@ input {
   font-size: 11px;
 }
 
+.components-button.tracked-session__delete {
+  height: auto;
+  font-size: 11px;
+}
+
+.tracked-session__delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracked-session__delete-question {
+  font-size: 11px;
+  color: #cc1818;
+}
+
 .tracked-session__empty {
   margin: 0 0 8px;
   color: #8d8d8d;

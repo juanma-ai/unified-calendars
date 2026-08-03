@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   addSessionNote: (entryId, text) => ipcRenderer.invoke('tracking:addSessionNote', entryId, text),
   updateSessionNote: (noteId, text) => ipcRenderer.invoke('tracking:updateNote', noteId, text),
   deleteSessionNote: (noteId) => ipcRenderer.invoke('tracking:deleteNote', noteId),
+  deleteSession: (entryId) => ipcRenderer.invoke('tracking:deleteSession', entryId),
   closeNoteWindow: () => ipcRenderer.invoke('tracking:closeNoteWindow'),
   listProjects: () => ipcRenderer.invoke('projects:list'),
   addProject: (name) => ipcRenderer.invoke('projects:add', name),

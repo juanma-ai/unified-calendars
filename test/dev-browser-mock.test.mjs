@@ -93,6 +93,25 @@ test('hides and restores an event under the same key the real store uses', async
   assert.equal(afterRestore.hiddenEvents.length, 0)
 })
 
+test('deleting a tracked session removes it from later reads', async () => {
+  const api = createDevBrowserApi()
+  const range = [
+    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  ]
+
+  const before = await api.getUnifiedEvents(...range)
+  const session = before.find((event) => event.source === 'timetracker')
+
+  await api.deleteSession(session.providerEventId)
+
+  const after = await api.getUnifiedEvents(...range)
+  assert.ok(!after.some((event) => event.id === session.id), 'the session is gone on refresh')
+  assert.equal(after.length, before.length - 1, 'only that session was removed')
+
+  await assert.rejects(() => api.deleteSession('999999'), /No tracked session with id/)
+})
+
 test('never overwrites a bridge the preload already installed', () => {
   const real = { getPreferences: () => {} }
   const target = { calendarAPI: real }

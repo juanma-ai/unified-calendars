@@ -259,7 +259,9 @@ export function App() {
       updateNote: (noteId, text) =>
         runSessionWrite(() => window.calendarAPI.updateSessionNote(noteId, text)),
       deleteNote: (noteId) =>
-        runSessionWrite(() => window.calendarAPI.deleteSessionNote(noteId))
+        runSessionWrite(() => window.calendarAPI.deleteSessionNote(noteId)),
+      deleteSession: (event) =>
+        runSessionWrite(() => window.calendarAPI.deleteSession(event.providerEventId))
     }),
     [runSessionWrite]
   )

@@ -40,11 +40,13 @@ export function TrackedSessionPopover({
   const [draft, setDraft] = useState('')
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const reset = () => {
     setEditingId(null)
     setAdding(false)
     setDraft('')
+    setConfirmingDelete(false)
   }
 
   // Every write goes through the same guard. The popover lives inside a Dropdown, so a
@@ -222,6 +224,45 @@ export function TrackedSessionPopover({
         >
           Hide this occurrence
         </Button>
+        {/* Hiding only removes the bar from the grid; the tracker's totals still count the
+            session. This is the hard delete. The card lives inside a Dropdown, so the
+            confirm is an inline second click rather than a nested modal. */}
+        {editable &&
+          (confirmingDelete ? (
+            <span className="tracked-session__delete-confirm">
+              <span className="tracked-session__delete-question">
+                Delete this session and its notes?
+              </span>
+              <Button disabled={busy} onClick={reset} size="small" variant="tertiary">
+                Cancel
+              </Button>
+              <Button
+                disabled={busy}
+                isDestructive
+                onClick={() =>
+                  run(async () => {
+                    await sessionActions.deleteSession(event)
+                    // The session no longer exists; an open card would describe a dead row.
+                    onClose()
+                  })
+                }
+                size="small"
+                variant="primary"
+              >
+                Delete
+              </Button>
+            </span>
+          ) : (
+            <Button
+              className="tracked-session__delete"
+              disabled={busy}
+              isDestructive
+              onClick={() => setConfirmingDelete(true)}
+              variant="link"
+            >
+              Delete session
+            </Button>
+          ))}
       </div>
     </div>
   )

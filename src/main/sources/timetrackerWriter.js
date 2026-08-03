@@ -161,6 +161,24 @@ export function createTimetrackerWriter({ runQuery, appendNote, now = () => Date
     return { noteId }
   }
 
+  // A hard delete, not a hide: the session must leave every total, not just the grid.
+  // The mirror keeps its bullets for the same reason note edits leave it alone — it is a
+  // log of what was typed, and the database is what the calendar reads.
+  async function deleteEntry(entryId) {
+    const id = toEntryId(entryId)
+    const entry = await getEntry(id)
+    if (!entry) throw new Error(`No tracked session with id ${entryId}`)
+
+    // Deleting the running session is allowed, but stop it first — otherwise anything
+    // that already asked for the running entry is left pointing at a deleted row.
+    if (entry.end === null || entry.end === undefined) await stopTracking()
+
+    // Notes first so no note row ever outlives its entry, in one statement so a single
+    // sqlite3 spawn covers both.
+    await runQuery(`DELETE FROM notes WHERE entry_id = ${id}; DELETE FROM entries WHERE id = ${id};`)
+    return { entryId: id, project: entry.project }
+  }
+
   return {
     getRunningEntry,
     getEntry,
@@ -169,7 +187,8 @@ export function createTimetrackerWriter({ runQuery, appendNote, now = () => Date
     addNote,
     addNoteToEntry,
     updateNote,
-    deleteNote
+    deleteNote,
+    deleteEntry
   }
 }
 
