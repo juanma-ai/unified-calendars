@@ -413,6 +413,16 @@ export function createDevBrowserApi() {
 
     getPreferences: async () => snapshot(),
 
+    // Tracking writes nothing in the browser mock: the tray and the note window are the
+    // only callers and neither exists here, so these just have to be present and inert.
+    getRunningTracking: async () => null,
+    startTracking: async (project) => ({ project, start: Math.floor(Date.now() / 1000) }),
+    stopTracking: async () => Math.floor(Date.now() / 1000),
+    addTrackingNote: async () => {
+      throw new Error('No timer running — start one before adding a note.')
+    },
+    closeNoteWindow: async () => {},
+
     setCalendarColor: async (calendarId, color) => {
       preferences.calendarColors[calendarId] = color
       return snapshot()

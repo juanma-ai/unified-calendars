@@ -247,3 +247,49 @@ test('tracked sessions stay out of the menu bar and never claim the tray title',
   assert.deepEqual(agenda.events.map((event) => event.title), ['Standup'])
   assert.equal(getTrayTitle(agenda), '25m Standup')
 })
+
+test('a running timer takes the tray title from the next event', () => {
+  const now = new Date('2026-07-22T10:45:00+02:00')
+  const agenda = buildAgenda(
+    [
+      {
+        id: 'google:standup',
+        source: 'google',
+        title: 'Standup',
+        calendarId: 'google:work:primary',
+        calendarDefaultVisible: true,
+        start: '2026-07-22T11:10:00+02:00',
+        end: '2026-07-22T11:30:00+02:00'
+      }
+    ],
+    { now }
+  )
+
+  assert.equal(getTrayTitle(agenda), '25m Standup', 'unchanged when nothing is tracked')
+
+  const tracking = { running: { project: 'certification', elapsedMs: 72 * 60_000 } }
+  assert.equal(getTrayTitle(agenda, tracking), '⏱ 1:12 certification')
+
+  // The next meeting is still the first agenda row, so nothing is actually lost.
+  assert.equal(agenda.events[0].title, 'Standup')
+})
+
+test('the tracking section sits above the agenda rows and is absent without it', () => {
+  const agenda = buildAgenda([], { now: new Date('2026-07-22T10:45:00+02:00') })
+
+  const plain = buildMenuTemplate(agenda).map((item) => item.label)
+  assert.ok(!plain.some((label) => label?.startsWith('▶ ')))
+
+  const withTracking = buildMenuTemplate(agenda, {
+    tracking: {
+      running: null,
+      startable: ['admin'],
+      today: { total: 0 },
+      week: { total: 0 },
+      byProject: []
+    }
+  }).map((item) => item.label)
+
+  assert.equal(withTracking[0], '▶ admin', 'tracking leads the menu')
+  assert.ok(withTracking.some((label) => label?.startsWith('Today:')))
+})

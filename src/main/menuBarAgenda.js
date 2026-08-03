@@ -1,6 +1,10 @@
 import { createRequire } from 'node:module'
 
 const AGENDA_REFRESH_MS = 60 * 1000
+// A running timer shows minutes in the title, so it needs a tighter beat than the agenda.
+const TRACKING_REFRESH_MS = 30 * 1000
+import { buildTrackingMenuItems, getTrackingTitle } from './trayTracking.js'
+
 const require = createRequire(import.meta.url)
 const electron = require('electron')
 const { Menu, nativeImage, shell, Tray } = electron
@@ -160,7 +164,13 @@ export function buildAgenda(events, { locale = undefined, now = new Date(), pref
   }
 }
 
-export function getTrayTitle(agenda) {
+export function getTrayTitle(agenda, tracking = null) {
+  // A running timer is the more urgent thing to see, and it is the reason this app now
+  // owns the menu bar slot the SwiftBar tracker used to. The next event is still the
+  // first agenda row in the menu itself, so nothing is lost.
+  const trackingTitle = getTrackingTitle(tracking)
+  if (trackingTitle) return trackingTitle.slice(0, 32)
+
   const nextEvent = agenda.events.find((event) => event.isNext)
   if (!nextEvent) return 'No events'
 
@@ -174,6 +184,10 @@ export function getTrayTitle(agenda) {
 export function buildMenuTemplate(
   agenda,
   {
+    tracking = null,
+    startTracking = () => {},
+    stopTracking = () => {},
+    addNote = () => {},
     openCalendar = () => {},
     openEvent = () => {},
     openSettings = () => {},
@@ -198,7 +212,12 @@ export function buildMenuTemplate(
       }))
     : [{ label: 'No events today', enabled: false }]
 
+  const trackingItems = tracking
+    ? [...buildTrackingMenuItems(tracking, { startTracking, stopTracking, addNote }), { type: 'separator' }]
+    : []
+
   return [
+    ...trackingItems,
     { label: agenda.dayLabel, enabled: false },
     { label: nextLabel, enabled: false },
     { type: 'separator' },
@@ -223,11 +242,17 @@ export function createMenuBarAgenda({
   getCalendarPreferences,
   getMainWindow,
   getUnifiedEvents,
+  loadTracking = null,
+  startTracking = () => {},
+  stopTracking = () => {},
+  addNote = () => {},
   onEventsRefreshed = () => {}
 }) {
   let tray
   let refreshTimer
+  let trackingTimer
   let lastAgenda = null
+  let lastTracking = null
 
   async function loadAgenda({ force = false } = {}) {
     const range = getTodayRange()
@@ -238,11 +263,34 @@ export function createMenuBarAgenda({
     return buildAgenda(events, { preferences: getCalendarPreferences() })
   }
 
+  async function updateTracking() {
+    if (!loadTracking) return null
+    try {
+      lastTracking = await loadTracking()
+    } catch (error) {
+      // Tracking is additive: if it cannot be read, the agenda still works.
+      console.warn('Failed to read tracking state:', error)
+      lastTracking = null
+    }
+    return lastTracking
+  }
+
+  function paintTitle() {
+    tray.setTitle(lastAgenda ? getTrayTitle(lastAgenda, lastTracking) : 'Loading...')
+  }
+
+  // The clock in the title has to advance without a full agenda refresh, so this ticks on
+  // its own beat and only re-reads the cheap local database.
+  async function tickTracking() {
+    await updateTracking()
+    if (tray) paintTitle()
+  }
+
   async function updatePopover() {
     try {
-      const agenda = await loadAgenda()
+      const [agenda] = await Promise.all([loadAgenda(), updateTracking()])
       lastAgenda = agenda
-      tray.setTitle(getTrayTitle(agenda))
+      paintTitle()
     } catch (error) {
       console.warn('Failed to load menu bar agenda:', error)
       tray.setTitle('Agenda unavailable')
@@ -273,6 +321,10 @@ export function createMenuBarAgenda({
       events: []
     }
     const menu = Menu.buildFromTemplate(buildMenuTemplate(agenda, {
+      tracking: lastTracking,
+      startTracking: (project) => Promise.resolve(startTracking(project)).then(tickTracking),
+      stopTracking: () => Promise.resolve(stopTracking()).then(tickTracking),
+      addNote,
       openCalendar,
       openEvent: (url) => shell.openExternal(url),
       openSettings,
@@ -290,22 +342,25 @@ export function createMenuBarAgenda({
     tray.on('click', showMenu)
     tray.on('right-click', showMenu)
 
-    loadAgenda()
+    updateTracking()
+      .then(() => loadAgenda())
       .then((agenda) => {
         lastAgenda = agenda
-        tray.setTitle(getTrayTitle(agenda))
+        paintTitle()
       })
       .catch((error) => {
         console.warn('Failed to load menu bar agenda title:', error)
         tray.setTitle('Agenda unavailable')
       })
     refreshTimer = setInterval(updatePopover, AGENDA_REFRESH_MS)
+    if (loadTracking) trackingTimer = setInterval(tickTracking, TRACKING_REFRESH_MS)
   }
 
   function stop() {
     if (refreshTimer) clearInterval(refreshTimer)
+    if (trackingTimer) clearInterval(trackingTimer)
     if (tray) tray.destroy()
   }
 
-  return { start, stop }
+  return { start, stop, refreshTracking: tickTracking }
 }

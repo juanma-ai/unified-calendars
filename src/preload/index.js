@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   getTimetrackerStats: () => ipcRenderer.invoke('timetracker:getStats'),
   chooseTimetrackerFolder: () => ipcRenderer.invoke('timetracker:chooseDataDir'),
   getPreferences: () => ipcRenderer.invoke('preferences:get'),
+  getRunningTracking: () => ipcRenderer.invoke('tracking:getRunning'),
+  startTracking: (project) => ipcRenderer.invoke('tracking:start', project),
+  stopTracking: () => ipcRenderer.invoke('tracking:stop'),
+  addTrackingNote: (text) => ipcRenderer.invoke('tracking:addNote', text),
+  closeNoteWindow: () => ipcRenderer.invoke('tracking:closeNoteWindow'),
   setCalendarColor: (calendarId, color) =>
     ipcRenderer.invoke('preferences:setCalendarColor', calendarId, color),
   setCalendarSidebarVisibility: (calendarId, visible) =>

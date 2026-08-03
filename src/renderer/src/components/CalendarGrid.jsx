@@ -1,6 +1,7 @@
 import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
+import { TrackedSessionBar } from './TrackedSessionBar.jsx'
 import { formatViewLabel, getViewDays } from '../calendarViews.js'
 import {
   buildDayLayout,
@@ -388,14 +389,16 @@ export function CalendarGrid({
                       <div className="calendar-week__tracked-lane">
                         {layout.trackedEvents.map((position) => {
                           const event = position.event
-                          const running = isRunning(event)
+                          const color = getEventColor(event, preferences)
 
                           return (
-                            <div
-                              aria-label={getTrackedLabel(event, now.getTime())}
-                              className={`calendar-week__tracked-bar${running ? ' is-running' : ''}`}
+                            <TrackedSessionBar
+                              color={color}
+                              event={event}
                               key={event.id}
-                              role="img"
+                              label={getTrackedLabel(event, now.getTime())}
+                              onHideEvent={onHideEvent}
+                              running={isRunning(event)}
                               style={{
                                 top: (position.startMinutes / 60) * HOUR_HEIGHT,
                                 height: (position.durationMinutes / 60) * HOUR_HEIGHT,
@@ -406,14 +409,9 @@ export function CalendarGrid({
                                   position.column / position.columnCount
                                 })`,
                                 width: `calc((100% - 8px) / ${position.columnCount})`,
-                                background: getEventColor(event, preferences)
+                                background: color
                               }}
-                              title={getTrackedLabel(event, now.getTime())}
-                            >
-                              {running && (
-                                <span aria-hidden="true" className="calendar-week__tracked-live" />
-                              )}
-                            </div>
+                            />
                           )
                         })}
                       </div>

@@ -6,12 +6,10 @@ import { CalendarGrid } from './components/CalendarGrid.jsx'
 import { CalendarSidebar } from './components/CalendarSidebar.jsx'
 import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
-import { SourceLegend } from './components/SourceLegend.jsx'
 import { getIpcErrorMessage } from './ipcErrors.js'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendarViewModel.js'
-import { shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
@@ -326,9 +324,6 @@ export function App() {
           {calendarView === 'year' && (
             <YearView anchorDate={anchorDate} events={visibleEvents} onOpenDay={openDay} />
           )}
-          {/* Only the day/week time grid draws tracked lane bars, so only it needs the key. */}
-          {(calendarView === 'day' || calendarView === 'week') &&
-            shouldShowSourceLegend(preferences, statuses) && <SourceLegend />}
           {(calendarView === 'day' || calendarView === 'week') && (
             <CalendarGrid
               anchorDate={anchorDate}

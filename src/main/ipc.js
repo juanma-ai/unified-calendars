@@ -90,7 +90,20 @@ function rescheduleEventNotifications(preferences) {
   eventNotificationScheduler.schedule(lastNotificationEvents, preferences)
 }
 
-export function registerIpcHandlers() {
+export function registerIpcHandlers({ tracking = null, openNoteWindow = () => {}, closeNoteWindow = () => {} } = {}) {
+  if (tracking) {
+    ipcMain.handle('tracking:getRunning', () => tracking.getRunning())
+    ipcMain.handle('tracking:start', (_event, project) => tracking.start(String(project ?? '')))
+    ipcMain.handle('tracking:stop', () => tracking.stop())
+    ipcMain.handle('tracking:addNote', (_event, text) => tracking.addNote(String(text ?? '')))
+  }
+  ipcMain.handle('tracking:openNoteWindow', () => {
+    openNoteWindow()
+  })
+  ipcMain.handle('tracking:closeNoteWindow', () => {
+    closeNoteWindow()
+  })
+
   ipcMain.handle('calendar:getUnifiedEvents', async (_event, rangeStart, rangeEnd) => {
     return getUnifiedEvents(rangeStart, rangeEnd)
   })

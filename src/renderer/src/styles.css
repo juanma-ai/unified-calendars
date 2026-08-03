@@ -1353,6 +1353,29 @@ input {
   transform: translateX(-50%);
 }
 
+/* The bar is the coloured block; this is the transparent control stretched over it that
+ * opens the session card. Both layers are absolute so the 14px lane keeps its width — a
+ * `@wordpress/components` Button brought along its own min-width, height and padding. */
+.calendar-week__tracked-bar-dropdown {
+  position: absolute;
+  inset: 0;
+}
+
+.components-button.calendar-week__tracked-bar-button {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: transparent;
+  border-radius: inherit;
+}
+
+/* Matches the scheduled pill: the bar stays visibly selected while its card is open. */
+.components-button.calendar-week__tracked-bar-button.is-session-selected {
+  box-shadow: 0 0 0 2px rgba(56, 88, 233, 0.5);
+}
+
 /* Month: one segment per project along the bottom of the cell, length
  * proportional to hours worked (ten hours fills the cell). */
 .calendar-month__tracked {
@@ -1364,7 +1387,9 @@ input {
 
 .calendar-month__tracked span {
   border-radius: 1px;
+}
 
+/* ---------------------------------------------------------------------------
    Issue #7 — sidebar Time Tracker section: master switch, per-project totals
    and the range summary (label, stacked proportion bar, running session).
    --------------------------------------------------------------------------- */
@@ -1402,16 +1427,18 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+/* 8px matches `.calendar-sidebar__calendar-toggle`'s inset, so the hint, the summary and
+   its divider line up with the project names above them rather than sitting 4px left. */
 .calendar-sidebar__tracked-hint {
   margin: 6px 0 0;
-  padding: 0 4px;
+  padding: 0 8px;
   color: #8d8d8d;
   font-size: 11px;
   line-height: 1.4;
 }
 
 .calendar-sidebar__tracked-summary {
-  margin: 10px 4px 0;
+  margin: 10px 8px 0;
   padding-top: 10px;
   border-top: 1px solid #ededed;
 }
@@ -1653,72 +1680,6 @@ input {
   box-shadow: 0 0 0 2px rgba(56, 88, 233, 0.5);
 }
 
-/* --- Issue #10: split-lane legend strip (SourceLegend.jsx) ------------------ */
-
-.source-legend {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
-  border-bottom: 1px solid #ededed;
-}
-
-/*
- * `.calendar-main` is a plain block, so the grid's `height: 100%` would push its bottom
- * out of the clipped main once the strip sits above it. Scoped to the strip's presence so
- * the other views' layout is untouched.
- */
-.calendar-main:has(.source-legend) {
-  display: flex;
-  flex-direction: column;
-}
-
-.calendar-main:has(.source-legend) > .calendar-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-}
-
-.source-legend__item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #707070;
-  font-size: 12px;
-}
-
-.source-legend__swatch {
-  flex: none;
-  border-radius: 2px;
-}
-
-/* The shape of a scheduled event pill. */
-.source-legend__swatch--scheduled {
-  width: 18px;
-  height: 10px;
-  border: 1px solid rgba(56, 88, 233, 0.35);
-  border-left: 3px solid #3858e9;
-  background: rgba(56, 88, 233, 0.12);
-}
-
-/* The shape of a tracked-session lane bar; the fill comes from SOURCE_COLORS. */
-.source-legend__swatch--tracked {
-  width: 6px;
-  height: 12px;
-}
-
-.source-legend__hint {
-  margin-left: auto;
-  color: #8d8d8d;
-  font-size: 12px;
-}
-
-.source-legend__hint code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-}
-
 /* --- Issue #11: Settings → Connections, Time Tracker card --------------------
    Values taken from the split-lane mockup (`Time Tracker source.dc.html`). The
    Detected badge is deliberately quieter than the generic Connected badge: the
@@ -1749,4 +1710,58 @@ input {
 .settings-timetracker__note {
   color: #8d8d8d;
   font-size: 12px;
+}
+
+/* Tracking note composer (its own small always-on-top window) */
+
+.note-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.note-window__header {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.note-window__input {
+  width: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.note-window__input:focus {
+  border-color: var(--accent);
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.note-window__error {
+  margin: 0;
+  color: #cc1818;
+  font-size: 12px;
+}
+
+.note-window__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-window__hint {
+  flex: 1 1 auto;
+  color: #8d8d8d;
+  font-size: 11px;
 }
