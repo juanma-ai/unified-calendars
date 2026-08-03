@@ -7,13 +7,10 @@ import { CalendarSidebar } from './components/CalendarSidebar.jsx'
 import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
 import { SourceLegend } from './components/SourceLegend.jsx'
-
 import { getIpcErrorMessage } from './ipcErrors.js'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendarViewModel.js'
-
-import { buildCalendars, filterVisibleEvents } from './calendarViewModel.js'
 import { shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
