@@ -90,15 +90,17 @@ test('notes attach to their own entry and an entry without notes maps cleanly', 
       { id: 5, project: 'certification', start: start + 7200, end: start + 9000 }
     ],
     notes: [
-      { entry_id: 4, ts: start + 60, text: 'Working on Hooks' },
-      { entry_id: 5, ts: start + 7260, text: 'just testing' },
-      { entry_id: 5, ts: start + 7320, text: 'rest_ensure_response?' }
+      { id: 1, entry_id: 4, ts: start + 60, text: 'Working on Hooks' },
+      { id: 2, entry_id: 5, ts: start + 7260, text: 'just testing' },
+      { id: 3, entry_id: 5, ts: start + 7320, text: 'rest_ensure_response?' }
     ]
   })
 
   const [first, second] = (await fetch(RANGE_START, RANGE_END)).events
   assert.deepEqual(first.notes.map((note) => note.text), ['Working on Hooks'])
   assert.equal(first.notes[0].ts, new Date((start + 60) * 1000).toISOString())
+  // The row id has to survive the read, or the popover cannot say which note to edit.
+  assert.deepEqual(second.notes.map((note) => note.id), [2, 3])
   assert.equal(second.notes.length, 2)
 
   const noNotes = createSource({ entries: [{ id: 9, project: 'admin', start, end: start + 60 }] })

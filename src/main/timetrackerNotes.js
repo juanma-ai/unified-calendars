@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export const NOTES_DIR = 'notes'
@@ -42,6 +42,50 @@ export function buildNoteAppend(existing, project, ts, text) {
   return out + bullet
 }
 
+/**
+ * Where a note belongs in a file that is no longer written in chronological order. Notes
+ * used to arrive only from a running timer, so appending was always right; a note added to
+ * a session that finished last week is stamped with that session's time, and appending it
+ * would file a 14:53 bullet under today's date heading.
+ *
+ * Returns `{ append }` — the chunk to append, byte-identical to what the SwiftBar plugin
+ * produced — or `{ contents }`, the whole file with the bullet slotted into its own day.
+ */
+export function placeNote(existing, project, ts, text) {
+  const append = buildNoteAppend(existing, project, ts, text)
+  const header = `## ${formatNoteDate(new Date(ts * 1000))}`
+  if (existing === null || !existing.includes(header)) return { append }
+
+  const lines = existing.split('\n')
+  const start = lines.findIndex((line) => line.trim() === header)
+  if (start === -1) return { append }
+
+  const after = lines.findIndex((line, index) => index > start && line.startsWith('## '))
+  // The day is already the last section in the file, so appending puts the bullet in the
+  // right place anyway — and leaves the file untouched apart from the addition.
+  if (after === -1) return { append }
+
+  // Back up over the blank lines that separate this section from the next one, so the
+  // bullet joins its own day rather than opening the following one.
+  let end = after
+  while (end > start + 1 && lines[end - 1].trim() === '') end -= 1
+
+  // Within the day the file reads as a chronological log, so slot the bullet in front of
+  // the first note that is later than it rather than dropping it at the bottom.
+  const minutes = formatNoteTime(new Date(ts * 1000))
+  let at = end
+  for (let index = start + 1; index < end; index += 1) {
+    const stamp = lines[index].match(/^- (?:\[[ x]\] )?\*\*(\d{2}:\d{2})\*\*/)
+    if (stamp && stamp[1] > minutes) {
+      at = index
+      break
+    }
+  }
+
+  const bullet = append.replace(/\n$/, '')
+  return { contents: [...lines.slice(0, at), bullet, ...lines.slice(at)].join('\n') }
+}
+
 export function createNoteMirror({ notesDir }) {
   return async function appendNote(project, ts, text) {
     await mkdir(notesDir, { recursive: true })
@@ -54,7 +98,10 @@ export function createNoteMirror({ notesDir }) {
       // Missing file is the "start a new project log" case, not an error.
     }
 
-    await appendFile(file, buildNoteAppend(existing, project, ts, text))
+    const placement = placeNote(existing, project, ts, text)
+    if (placement.append !== undefined) await appendFile(file, placement.append)
+    else await writeFile(file, placement.contents)
+
     return file
   }
 }

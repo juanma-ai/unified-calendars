@@ -76,6 +76,24 @@ export function createTrackingController({
       return result
     },
 
+    async addSessionNote(entryId, text) {
+      const result = await writer().addNoteToEntry(entryId, text)
+      afterWrite()
+      return result
+    },
+
+    async updateNote(noteId, text) {
+      const result = await writer().updateNote(noteId, text)
+      afterWrite()
+      return result
+    },
+
+    async deleteNote(noteId) {
+      const result = await writer().deleteNote(noteId)
+      afterWrite()
+      return result
+    },
+
     async getRunning() {
       const entry = await writer().getRunningEntry()
       return entry ? { project: entry.project, startMs: entry.start * 1000 } : null

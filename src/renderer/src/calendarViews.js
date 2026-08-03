@@ -215,15 +215,36 @@ function dayKey(date) {
  * heat level. Level 0 means no events; the remaining levels split the range up
  * to the busiest day evenly, so the scale adapts to how full the year actually
  * is instead of using fixed thresholds.
+ *
+ * Tracked sessions are counted separately, as the distinct projects worked on that day,
+ * and each month reports how many of its days had any. Colour and dots are then two
+ * independent readings — how full the day was, and what was worked on — rather than the
+ * same signal counted twice, which is what letting sessions inflate the count would do:
+ * three sessions of one project would read busier than three meetings.
  */
 export function buildYearHeatmap(events, anchor) {
   const counts = new Map()
+  const projects = new Map()
   const year = anchor.getFullYear()
 
   for (const event of events) {
     const start = new Date(event.start)
     if (start.getFullYear() !== year) continue
     const key = dayKey(start)
+
+    if (isTrackedEvent(event)) {
+      const worked = projects.get(key) ?? new Map()
+      if (!worked.has(event.calendarId)) {
+        worked.set(event.calendarId, {
+          calendarId: event.calendarId,
+          project: event.calendarName,
+          event
+        })
+      }
+      projects.set(key, worked)
+      continue
+    }
+
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
@@ -231,17 +252,23 @@ export function buildYearHeatmap(events, anchor) {
 
   const months = Array.from({ length: 12 }, (_, month) => {
     const monthStart = new Date(year, month, 1)
-    return {
-      month,
-      start: monthStart,
-      days: eachDayOfInterval({ start: monthStart, end: endOfMonth(monthStart) }).map((day) => {
+    const days = eachDayOfInterval({ start: monthStart, end: endOfMonth(monthStart) }).map(
+      (day) => {
         const count = counts.get(dayKey(day)) ?? 0
         return {
           day,
           count,
-          level: count === 0 ? 0 : Math.ceil((count / maxCount) * YEAR_HEAT_LEVELS)
+          level: count === 0 ? 0 : Math.ceil((count / maxCount) * YEAR_HEAT_LEVELS),
+          trackedProjects: [...(projects.get(dayKey(day))?.values() ?? [])]
         }
-      })
+      }
+    )
+
+    return {
+      month,
+      start: monthStart,
+      days,
+      trackedDays: days.filter((entry) => entry.trackedProjects.length > 0).length
     }
   })
 

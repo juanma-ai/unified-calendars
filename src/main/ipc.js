@@ -115,6 +115,16 @@ export function registerIpcHandlers({
     ipcMain.handle('tracking:start', (_event, project) => tracking.start(String(project ?? '')))
     ipcMain.handle('tracking:stop', () => tracking.stop())
     ipcMain.handle('tracking:addNote', (_event, text) => tracking.addNote(String(text ?? '')))
+    // The session channels carry a row id from the renderer, so they are the one tracking
+    // path where the number is not ours. Number() them here rather than trusting the
+    // caller: the writer rejects anything that is not an integer.
+    ipcMain.handle('tracking:addSessionNote', (_event, entryId, text) =>
+      tracking.addSessionNote(Number(entryId), String(text ?? ''))
+    )
+    ipcMain.handle('tracking:updateNote', (_event, noteId, text) =>
+      tracking.updateNote(Number(noteId), String(text ?? ''))
+    )
+    ipcMain.handle('tracking:deleteNote', (_event, noteId) => tracking.deleteNote(Number(noteId)))
   }
   ipcMain.handle('tracking:openNoteWindow', () => {
     openNoteWindow()

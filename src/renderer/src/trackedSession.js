@@ -38,8 +38,14 @@ export function parseSessionNote(note) {
   const isTodo = TODO_PREFIX.test(text)
 
   return {
+    // The row id is what an edit or a delete addresses; a note read from a database that
+    // predates the id column has none, and the popover offers no editing for those.
+    id: note.id ?? null,
     ts: note.ts,
     text: isTodo ? text.replace(TODO_PREFIX, '') : text,
+    // Editing has to round-trip what is stored, not what is shown: saving the parsed text
+    // back would quietly strip the `todo:` marker off every note it touched.
+    rawText: text,
     isTodo
   }
 }

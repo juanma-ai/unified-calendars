@@ -71,7 +71,8 @@ export function CalendarGrid({
   events,
   onEventTimeChange,
   onHideEvent,
-  preferences
+  preferences,
+  sessionActions
 }) {
   const days = getViewDays(calendarView, anchorDate)
   const viewportRef = useRef(null)
@@ -298,7 +299,12 @@ export function CalendarGrid({
                           : undefined
                       }
                     >
-                      <EventPill event={event} onHideEvent={onHideEvent} preferences={preferences} />
+                      <EventPill
+                        event={event}
+                        onHideEvent={onHideEvent}
+                        preferences={preferences}
+                        sessionActions={sessionActions}
+                      />
                     </div>
                   )
                 })}
@@ -366,6 +372,7 @@ export function CalendarGrid({
                             event={event}
                             onHideEvent={onHideEvent}
                             preferences={preferences}
+                            sessionActions={sessionActions}
                             showTime
                           />
                           {canResizeEvent(event) && (
@@ -399,6 +406,7 @@ export function CalendarGrid({
                               label={getTrackedLabel(event, now.getTime())}
                               onHideEvent={onHideEvent}
                               running={isRunning(event)}
+                              sessionActions={sessionActions}
                               style={{
                                 top: (position.startMinutes / 60) * HOUR_HEIGHT,
                                 height: (position.durationMinutes / 60) * HOUR_HEIGHT,
