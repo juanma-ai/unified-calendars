@@ -79,7 +79,7 @@ test('Tracked entries carry provider ids and a running flag, never a URL to open
 
   const event = mapTrackedEntry(
     { id: 4, project: 'certification', start, end },
-    [{ entry_id: 4, ts: start + 60, text: 'Working on Hooks' }],
+    [{ id: 11, entry_id: 4, ts: start + 60, text: 'Working on Hooks' }],
     { now: Date.UTC(2026, 6, 26, 12, 0, 0) }
   )
 
@@ -96,8 +96,19 @@ test('Tracked entries carry provider ids and a running flag, never a URL to open
   assert.equal(event.isRunning, false)
   assert.equal(event.url, undefined, 'a tracked session has nowhere to open')
   assert.deepEqual(event.notes, [
-    { ts: '2026-07-26T10:06:00.000Z', text: 'Working on Hooks' }
+    { id: 11, ts: '2026-07-26T10:06:00.000Z', text: 'Working on Hooks' }
   ])
+})
+
+test('a note row without an id still maps, with a null id rather than a broken one', () => {
+  // Rows written before the calendar could edit them are read back the same way; the
+  // popover keys its edit affordance off a non-null id.
+  const start = Math.floor(Date.UTC(2026, 6, 26, 10, 0, 0) / 1000)
+  const event = mapTrackedEntry({ id: 4, project: 'certification', start, end: start + 60 }, [
+    { ts: start, text: 'legacy' }
+  ])
+
+  assert.deepEqual(event.notes, [{ id: null, ts: '2026-07-26T10:00:00.000Z', text: 'legacy' }])
 })
 
 test('A running entry with a start in the future never produces a negative duration', () => {

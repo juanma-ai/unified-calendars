@@ -12,7 +12,7 @@ function formatEventTime(event) {
   return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')}`
 }
 
-export function AgendaView({ anchorDate, events, onHideEvent, preferences }) {
+export function AgendaView({ anchorDate, events, onHideEvent, preferences, sessionActions }) {
   const sections = buildAgendaSections(events, getViewDays('agenda', anchorDate))
 
   if (sections.length === 0) {
@@ -43,6 +43,7 @@ export function AgendaView({ anchorDate, events, onHideEvent, preferences }) {
                 <EventPill
                   event={event}
                   onHideEvent={onHideEvent}
+                  sessionActions={sessionActions}
                   preferences={preferences}
                   variant="row"
                 />

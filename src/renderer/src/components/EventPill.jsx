@@ -58,6 +58,7 @@ export function EventPill({
   event,
   onHideEvent,
   preferences,
+  sessionActions,
   showTime = false,
   variant = 'pill'
 }) {
@@ -113,6 +114,7 @@ export function EventPill({
           event={event}
           onClose={onClose}
           onHideEvent={onHideEvent}
+          sessionActions={sessionActions}
         />
       ) : (
         <MenuGroup label={event.title}>

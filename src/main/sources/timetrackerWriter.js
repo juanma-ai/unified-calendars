@@ -29,6 +29,11 @@ function toEntryId(value) {
   return value
 }
 
+function toNoteId(value) {
+  if (!Number.isInteger(value)) throw new Error(`Invalid note id: ${value}`)
+  return value
+}
+
 function requireText(value, label) {
   const text = typeof value === 'string' ? value.trim() : ''
   if (!text) throw new Error(`A ${label} is required`)
@@ -90,12 +95,29 @@ export function createTimetrackerWriter({ runQuery, appendNote, now = () => Date
     return { project: name, start: seconds }
   }
 
-  async function addNote(text) {
-    const body = requireText(text, 'note')
-    const entry = await getRunningEntry()
-    if (!entry) throw new Error('No timer running — start one before adding a note.')
+  async function getEntry(entryId) {
+    const rows = await runQuery(
+      `SELECT id, project, start, end FROM entries WHERE id = ${toEntryId(entryId)};`
+    )
+    return rows[0] ?? null
+  }
 
+  /**
+   * A note added to a session that finished hours ago must not be stamped with the current
+   * time: it would sort after every other note and, in the markdown mirror, land under
+   * today's date heading rather than the day the work happened. So the clock is clamped
+   * into the session's own span. A running session has no end, so only the floor applies.
+   */
+  function noteTimestampFor(entry) {
     const seconds = toSeconds(now())
+    const floored = Math.max(seconds, entry.start)
+    return entry.end === null || entry.end === undefined ? floored : Math.min(floored, entry.end)
+  }
+
+  async function writeNote(entry, text) {
+    const body = requireText(text, 'note')
+    const seconds = noteTimestampFor(entry)
+
     await runQuery(
       `INSERT INTO notes (entry_id, ts, text) VALUES (${toEntryId(entry.id)}, ${seconds}, ${quote(body)});`
     )
@@ -106,7 +128,49 @@ export function createTimetrackerWriter({ runQuery, appendNote, now = () => Date
     return { entryId: entry.id, project: entry.project, ts: seconds, text: body }
   }
 
-  return { getRunningEntry, startTracking, stopTracking, addNote }
+  async function addNote(text) {
+    // Validate before the SELECT so an empty note never costs a query — the tray path has
+    // always behaved that way and the tests pin it.
+    requireText(text, 'note')
+    const entry = await getRunningEntry()
+    if (!entry) throw new Error('No timer running — start one before adding a note.')
+
+    return writeNote(entry, text)
+  }
+
+  async function addNoteToEntry(entryId, text) {
+    requireText(text, 'note')
+    const entry = await getEntry(entryId)
+    if (!entry) throw new Error(`No tracked session with id ${entryId}`)
+
+    return writeNote(entry, text)
+  }
+
+  // Editing and deleting touch the database only. The markdown mirror is append-only by
+  // design — it is the file the retired SwiftBar plugin wrote, and rewriting a bullet in
+  // place risks the seam that timetrackerNotes.js exists to avoid. The database is the
+  // record the calendar reads; the mirror is a log of what was typed when.
+  async function updateNote(noteId, text) {
+    const body = requireText(text, 'note')
+    await runQuery(`UPDATE notes SET text = ${quote(body)} WHERE id = ${toNoteId(noteId)};`)
+    return { noteId, text: body }
+  }
+
+  async function deleteNote(noteId) {
+    await runQuery(`DELETE FROM notes WHERE id = ${toNoteId(noteId)};`)
+    return { noteId }
+  }
+
+  return {
+    getRunningEntry,
+    getEntry,
+    startTracking,
+    stopTracking,
+    addNote,
+    addNoteToEntry,
+    updateNote,
+    deleteNote
+  }
 }
 
 export function createDefaultTimetrackerWriter({ dataDir } = {}) {

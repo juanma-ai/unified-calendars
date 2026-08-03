@@ -1656,13 +1656,51 @@ input {
   font-size: 11px;
 }
 
-.tracked-session__readonly {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
+.tracked-session__empty {
+  margin: 0 0 8px;
   color: #8d8d8d;
-  font-size: 11px;
+  font-size: 12px;
+}
+
+/* The note text takes the slack so the actions sit hard against the right edge, and the
+   row keeps its height when they are hidden — otherwise the list twitches on hover. */
+.tracked-session__note-text {
+  flex: 1;
+}
+
+.tracked-session__note-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  opacity: 0;
+}
+
+.tracked-session__note:hover .tracked-session__note-actions,
+.tracked-session__note:focus-within .tracked-session__note-actions {
+  opacity: 1;
+}
+
+.components-button.tracked-session__add {
+  margin-top: 10px;
+}
+
+.tracked-session__composer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tracked-session__composer .components-textarea-control__input {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tracked-session__composer-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .tracked-session__sr {

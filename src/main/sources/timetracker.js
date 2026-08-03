@@ -72,8 +72,11 @@ function entriesQuery(startSeconds, endSeconds, nowSeconds) {
   )
 }
 
+// `id` is selected because a note is now editable from the calendar, and `ts` is not a key:
+// two notes a second apart round to the same displayed minute, and nothing stops two notes
+// sharing a timestamp outright.
 function notesQuery(ids) {
-  return `SELECT entry_id, ts, text FROM notes WHERE entry_id IN (${ids.join(',')}) ORDER BY ts;`
+  return `SELECT id, entry_id, ts, text FROM notes WHERE entry_id IN (${ids.join(',')}) ORDER BY ts;`
 }
 
 function createSqliteRunner(dbPath) {

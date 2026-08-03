@@ -103,6 +103,9 @@ export function mapTrackedEntry(entry, notes = [], options = {}) {
     status: 'confirmed',
     isRunning,
     notes: notes.map((note) => ({
+      // The row id travels with the note so the popover can edit or delete exactly the one
+      // that was clicked. Older callers that pass note rows without an id still map cleanly.
+      id: note.id ?? null,
       ts: new Date(note.ts * SECONDS_TO_MS).toISOString(),
       text: note.text
     })),

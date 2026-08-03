@@ -19,7 +19,14 @@ function formatTrackedTooltip(projects) {
   return projects.map((entry) => `${entry.project} ${formatDuration(entry.ms)}`).join(' · ')
 }
 
-export function MonthView({ anchorDate, events, onHideEvent, onOpenDay, preferences }) {
+export function MonthView({
+  anchorDate,
+  events,
+  onHideEvent,
+  onOpenDay,
+  preferences,
+  sessionActions
+}) {
   const days = getViewDays('month', anchorDate)
   const cells = buildMonthCells(events, days, MAX_EVENTS_PER_DAY)
   const trackedTotals = buildTrackedDayTotals(events, days)
@@ -59,6 +66,7 @@ export function MonthView({ anchorDate, events, onHideEvent, onOpenDay, preferen
                     event={event}
                     key={event.id}
                     onHideEvent={onHideEvent}
+                    sessionActions={sessionActions}
                     preferences={preferences}
                     showTime
                   />

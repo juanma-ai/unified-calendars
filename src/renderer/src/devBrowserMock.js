@@ -290,7 +290,7 @@ function buildEvents() {
       project: 'calendar-app',
       start: at(0, 8, 15),
       end: at(0, 9, 25),
-      notes: [{ ts: at(0, 8, 40), text: 'Revisando el legend en día y semana' }]
+      notes: [{ id: 1, ts: at(0, 8, 40), text: 'Revisando el legend en día y semana' }]
     }),
     // Still running: this is what feeds the growing lane bar and the popover.
     trackedSession({
@@ -299,7 +299,7 @@ function buildEvents() {
       start: runningStart,
       end: new Date().toISOString(),
       isRunning: true,
-      notes: [{ ts: runningStart, text: 'Mock del bridge para revisar la UI' }]
+      notes: [{ id: 2, ts: runningStart, text: 'Mock del bridge para revisar la UI' }]
     })
   ]
 }
@@ -359,6 +359,35 @@ export function createDevBrowserApi() {
   // The real store returns a fresh snapshot after every write, and the renderer feeds
   // that straight back into state, so hand back copies rather than the live object.
   const snapshot = () => JSON.parse(JSON.stringify(preferences))
+
+  function requireMockText(text) {
+    const body = typeof text === 'string' ? text.trim() : ''
+    if (!body) throw new Error('A note is required')
+    return body
+  }
+
+  function trackedEvents() {
+    return events.filter((event) => event.source === 'timetracker')
+  }
+
+  function findTrackedEvent(entryId) {
+    const event = trackedEvents().find((entry) => entry.providerEventId === String(entryId))
+    if (!event) throw new Error(`No tracked session with id ${entryId}`)
+    return event
+  }
+
+  function findTrackedNote(noteId) {
+    for (const event of trackedEvents()) {
+      const note = event.notes.find((entry) => entry.id === noteId)
+      if (note) return { event, note }
+    }
+    throw new Error(`No note with id ${noteId}`)
+  }
+
+  function nextMockNoteId() {
+    const ids = trackedEvents().flatMap((event) => event.notes.map((note) => note.id ?? 0))
+    return Math.max(0, ...ids) + 1
+  }
 
   function eventsInRange(rangeStart, rangeEnd) {
     const start = new Date(rangeStart).getTime()
@@ -420,13 +449,32 @@ export function createDevBrowserApi() {
 
     getPreferences: async () => snapshot(),
 
-    // Tracking writes nothing in the browser mock: the tray and the note window are the
-    // only callers and neither exists here, so these just have to be present and inert.
+    // Starting and stopping stay inert: the tray is their only caller and it does not exist
+    // here. The session-note writes do not get that excuse — the popover calls them from
+    // the calendar itself, so they mutate the fixtures and the UI updates on refresh.
     getRunningTracking: async () => null,
     startTracking: async (project) => ({ project, start: Math.floor(Date.now() / 1000) }),
     stopTracking: async () => Math.floor(Date.now() / 1000),
     addTrackingNote: async () => {
       throw new Error('No timer running — start one before adding a note.')
+    },
+    addSessionNote: async (entryId, text) => {
+      const body = requireMockText(text)
+      const event = findTrackedEvent(entryId)
+      const note = { id: nextMockNoteId(), ts: new Date().toISOString(), text: body }
+      event.notes = [...event.notes, note]
+      return { entryId, project: event.title, ts: note.ts, text: body }
+    },
+    updateSessionNote: async (noteId, text) => {
+      const body = requireMockText(text)
+      const { event, note } = findTrackedNote(noteId)
+      event.notes = event.notes.map((entry) => (entry === note ? { ...entry, text: body } : entry))
+      return { noteId, text: body }
+    },
+    deleteSessionNote: async (noteId) => {
+      const { event, note } = findTrackedNote(noteId)
+      event.notes = event.notes.filter((entry) => entry !== note)
+      return { noteId }
     },
     closeNoteWindow: async () => {},
 

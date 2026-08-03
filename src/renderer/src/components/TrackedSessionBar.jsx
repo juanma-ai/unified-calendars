@@ -12,7 +12,15 @@ import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
  * image. The card it opens is the same read-only `TrackedSessionPopover` an `EventPill`
  * opens for a tracked event in the other views.
  */
-export function TrackedSessionBar({ color, event, label, onHideEvent, running, style }) {
+export function TrackedSessionBar({
+  color,
+  event,
+  label,
+  onHideEvent,
+  running,
+  sessionActions,
+  style
+}) {
   return (
     <div className={`calendar-week__tracked-bar${running ? ' is-running' : ''}`} style={style}>
       {running && <span aria-hidden="true" className="calendar-week__tracked-live" />}
@@ -34,6 +42,7 @@ export function TrackedSessionBar({ color, event, label, onHideEvent, running, s
             event={event}
             onClose={onClose}
             onHideEvent={onHideEvent}
+            sessionActions={sessionActions}
           />
         )}
       />

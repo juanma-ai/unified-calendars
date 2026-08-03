@@ -228,6 +228,38 @@ export function App() {
     [refresh]
   )
 
+  /**
+   * The tracked-session popover writes straight to the tracker's database, so there is no
+   * optimistic local copy to patch the way `handleEventTimeChange` does: the write lands,
+   * the source cache is invalidated in main, and the refresh brings back the truth. Errors
+   * surface in the same notice as every other failed action.
+   */
+  const runSessionWrite = useCallback(
+    async (write) => {
+      setActionError(null)
+      try {
+        await write()
+        await refresh()
+      } catch (error) {
+        setActionError(getIpcErrorMessage(error))
+        throw error
+      }
+    },
+    [refresh]
+  )
+
+  const sessionActions = useMemo(
+    () => ({
+      addNote: (event, text) =>
+        runSessionWrite(() => window.calendarAPI.addSessionNote(event.providerEventId, text)),
+      updateNote: (noteId, text) =>
+        runSessionWrite(() => window.calendarAPI.updateSessionNote(noteId, text)),
+      deleteNote: (noteId) =>
+        runSessionWrite(() => window.calendarAPI.deleteSessionNote(noteId))
+    }),
+    [runSessionWrite]
+  )
+
   const handleRestoreHiddenEvent = useCallback((key) => {
     window.calendarAPI.restoreHiddenEvent(key).then(setPreferences)
   }, [])
@@ -319,6 +351,7 @@ export function App() {
               onHideEvent={handleHideEvent}
               onOpenDay={openDay}
               preferences={preferences}
+              sessionActions={sessionActions}
             />
           )}
           {calendarView === 'agenda' && (
@@ -327,6 +360,7 @@ export function App() {
               events={visibleEvents}
               onHideEvent={handleHideEvent}
               preferences={preferences}
+              sessionActions={sessionActions}
             />
           )}
           {calendarView === 'year' && (
@@ -351,6 +385,7 @@ export function App() {
               onEventTimeChange={handleEventTimeChange}
               onHideEvent={handleHideEvent}
               preferences={preferences}
+              sessionActions={sessionActions}
             />
           )}
         </main>

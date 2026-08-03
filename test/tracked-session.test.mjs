@@ -51,21 +51,20 @@ test('a running session counts to now, not to the end the source last wrote', ()
 })
 
 test('todo-prefixed notes lose the prefix and are flagged', () => {
-  assert.deepEqual(parseSessionNote({ ts: 'x', text: 'todo: book the exam' }), {
-    ts: 'x',
-    text: 'book the exam',
-    isTodo: true
-  })
-  assert.deepEqual(parseSessionNote({ ts: 'x', text: '[] book the exam' }), {
-    ts: 'x',
-    text: 'book the exam',
-    isTodo: true
-  })
-  assert.deepEqual(parseSessionNote({ ts: 'x', text: 'TODO:book the exam' }), {
-    ts: 'x',
-    text: 'book the exam',
-    isTodo: true
-  })
+  for (const text of ['todo: book the exam', '[] book the exam', 'TODO:book the exam']) {
+    assert.deepEqual(parseSessionNote({ id: 3, ts: 'x', text }), {
+      id: 3,
+      ts: 'x',
+      text: 'book the exam',
+      // Editing writes rawText back, so the marker survives a round trip through the card.
+      rawText: text,
+      isTodo: true
+    })
+  }
+})
+
+test('a note read from a database without the id column is not editable', () => {
+  assert.equal(parseSessionNote({ ts: 'x', text: 'legacy' }).id, null)
 })
 
 test('a prefix that is not at the start is left alone', () => {
