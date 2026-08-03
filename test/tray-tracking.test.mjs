@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildTrackingMenuItems,
   buildTrackingState,
+  buildTrackingSummaryItems,
   formatTrackerClock,
   getTrackingTitle
 } from '../src/main/trayTracking.js'
@@ -72,6 +73,82 @@ test('totals separate today from the whole week', () => {
 
   assert.equal(state.today.total, 60 * 60_000)
   assert.equal(state.week.total, 90 * 60_000)
+  // Yesterday's admin session is in the week total but must not appear in today's rows.
+  assert.deepEqual(
+    state.today.byProject.map((entry) => entry.project),
+    ['certification']
+  )
+})
+
+test('a fragmented day is still one line per project, ordered by time spent', () => {
+  const state = buildTrackingState({
+    events: [
+      tracked({ project: 'certification', startMinutesAgo: 300, minutes: 45 }),
+      tracked({ project: 'admin', startMinutesAgo: 200, minutes: 28 }),
+      tracked({ project: 'certification', startMinutesAgo: 120, minutes: 62 })
+    ],
+    now: NOW
+  })
+
+  const items = buildTrackingSummaryItems(state)
+  assert.equal(items[0].label, 'Tracked today · 2h 15m')
+  assert.deepEqual(
+    items.slice(1).map((item) => item.label.trim().replace(/\s+/g, ' ')),
+    ['certification 1h 47m', 'admin 28m'],
+    'three sessions of two projects are two rows, biggest first'
+  )
+  assert.ok(items.every((item) => item.enabled === false), 'the summary is not clickable')
+})
+
+test('the open session gets its own line, on top of its project total', () => {
+  const state = buildTrackingState({
+    events: [
+      tracked({ project: 'certification', startMinutesAgo: 300, minutes: 107 }),
+      tracked({ project: 'certification', startMinutesAgo: 12, minutes: 1, running: true })
+    ],
+    now: NOW
+  })
+
+  const labels = buildTrackingSummaryItems(state).map((item) => item.label)
+  // A native Menu cannot animate, so the pulse elsewhere is a static marker here.
+  assert.ok(labels.some((label) => label.includes('● certification  running · 12m')))
+  // The running minutes are already inside the project's own total.
+  assert.ok(labels.some((label) => label.replace(/\s+/g, ' ').includes('certification 1h 59m')))
+})
+
+test('the summary disappears rather than showing an empty heading', () => {
+  const nothingToday = buildTrackingState({
+    events: [
+      {
+        ...tracked({ project: 'admin', startMinutesAgo: 0, minutes: 30 }),
+        start: new Date(NOW - 26 * 60 * 60_000).toISOString(),
+        end: new Date(NOW - 26 * 60 * 60_000 + 30 * 60_000).toISOString()
+      }
+    ],
+    now: NOW
+  })
+  assert.deepEqual(buildTrackingSummaryItems(nothingToday), [])
+
+  // `detected: false` is the "no tracker installed" signal, not a failure — the same one
+  // that keeps the sidebar quiet and hides the grid lane.
+  const undetected = buildTrackingState({
+    events: [tracked({ project: 'certification', startMinutesAgo: 60, minutes: 30 })],
+    detected: false,
+    now: NOW
+  })
+  assert.deepEqual(buildTrackingSummaryItems(undetected), [])
+  assert.deepEqual(buildTrackingSummaryItems(undefined), [])
+})
+
+test('today is not repeated in the controls section that now sits above it', () => {
+  const state = buildTrackingState({
+    events: [tracked({ project: 'certification', startMinutesAgo: 120, minutes: 60 })],
+    now: NOW
+  })
+
+  const labels = buildTrackingMenuItems(state).map((item) => item.label)
+  assert.ok(labels.includes('This week: 1h'))
+  assert.ok(!labels.some((label) => label?.startsWith('Today:')))
 })
 
 test('a session running past 12h is flagged rather than silently drawn', () => {

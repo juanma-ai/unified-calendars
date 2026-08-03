@@ -3,7 +3,11 @@ import { createRequire } from 'node:module'
 const AGENDA_REFRESH_MS = 60 * 1000
 // A running timer shows minutes in the title, so it needs a tighter beat than the agenda.
 const TRACKING_REFRESH_MS = 30 * 1000
-import { buildTrackingMenuItems, getTrackingTitle } from './trayTracking.js'
+import {
+  buildTrackingMenuItems,
+  buildTrackingSummaryItems,
+  getTrackingTitle
+} from './trayTracking.js'
 
 const require = createRequire(import.meta.url)
 const electron = require('electron')
@@ -216,6 +220,11 @@ export function buildMenuTemplate(
     ? [...buildTrackingMenuItems(tracking, { startTracking, stopTracking, addNote }), { type: 'separator' }]
     : []
 
+  // The summary reads what has already happened, so it sits after the forward-looking
+  // agenda rows rather than with the controls at the top.
+  const summaryItems = tracking ? buildTrackingSummaryItems(tracking) : []
+  const trackedTodayItems = summaryItems.length ? [...summaryItems, { type: 'separator' }] : []
+
   return [
     ...trackingItems,
     { label: agenda.dayLabel, enabled: false },
@@ -223,6 +232,7 @@ export function buildMenuTemplate(
     { type: 'separator' },
     ...eventItems,
     { type: 'separator' },
+    ...trackedTodayItems,
     { label: 'Open Calendar', click: openCalendar },
     { label: 'Settings', click: openSettings },
     { type: 'separator' },

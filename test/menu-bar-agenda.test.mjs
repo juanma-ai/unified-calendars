@@ -283,13 +283,49 @@ test('the tracking section sits above the agenda rows and is absent without it',
   const withTracking = buildMenuTemplate(agenda, {
     tracking: {
       running: null,
+      detected: true,
       startable: ['admin'],
-      today: { total: 0 },
-      week: { total: 0 },
-      byProject: []
+      today: { total: 0, byProject: [] },
+      week: { total: 0 }
     }
   }).map((item) => item.label)
 
   assert.equal(withTracking[0], '▶ admin', 'tracking leads the menu')
-  assert.ok(withTracking.some((label) => label?.startsWith('Today:')))
+  assert.ok(withTracking.some((label) => label?.startsWith('This week:')))
+})
+
+test("today's tracked time is summarised after the agenda rows, above Open Calendar", () => {
+  const agenda = buildAgenda([], { now: new Date('2026-07-22T10:45:00+02:00') })
+
+  const labels = buildMenuTemplate(agenda, {
+    tracking: {
+      running: { project: 'certification', elapsedMs: 12 * 60_000, notes: [] },
+      detected: true,
+      startable: [],
+      today: {
+        total: 135 * 60_000,
+        byProject: [
+          { calendarId: 'timetracker:certification', project: 'certification', ms: 107 * 60_000 },
+          { calendarId: 'timetracker:admin', project: 'admin', ms: 28 * 60_000 }
+        ]
+      },
+      week: { total: 21 * 60 * 60_000 }
+    }
+  }).map((item) => item.label)
+
+  const summary = labels.indexOf('Tracked today · 2h 15m')
+  assert.ok(summary > labels.indexOf('No events today'), 'the summary follows the agenda')
+  assert.ok(summary < labels.indexOf('Open Calendar'), 'and precedes Open Calendar')
+
+  // Nothing to summarise means no heading, no separator, no gap in the menu.
+  const quiet = buildMenuTemplate(agenda, {
+    tracking: {
+      running: null,
+      detected: true,
+      startable: ['admin'],
+      today: { total: 0, byProject: [] },
+      week: { total: 0 }
+    }
+  }).map((item) => item.label)
+  assert.ok(!quiet.some((label) => label?.startsWith('Tracked today')))
 })

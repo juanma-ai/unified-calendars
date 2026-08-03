@@ -23,7 +23,12 @@ function isToday(value, now) {
  * Everything the tray needs about tracking, derived from the week of tracked events the
  * source already returns — no extra query, and the totals cannot drift from the grid.
  */
-export function buildTrackingState({ events = [], projects = [], now = Date.now() } = {}) {
+export function buildTrackingState({
+  events = [],
+  projects = [],
+  detected = true,
+  now = Date.now()
+} = {}) {
   const tracked = events.filter((event) => event.source === 'timetracker')
   const runningEvent = tracked.find((event) => event.isRunning) ?? null
 
@@ -37,14 +42,22 @@ export function buildTrackingState({ events = [], projects = [], now = Date.now(
     : null
 
   const todayEvents = tracked.filter((event) => isToday(event.start, now))
+  const todayByProject = totalsByProject(todayEvents, now)
 
   return {
     running,
+    // No database means nothing to summarise, and a "Tracked today · 0m" line would be a
+    // permanent, meaningless row for anyone who does not run the tracker.
+    detected,
     // The running project is offered as "stop", never as another "start".
     startable: projects.filter((project) => project !== running?.project),
-    today: { total: totalsByProject(todayEvents, now).reduce((sum, x) => sum + x.ms, 0) },
-    week: { total: totalsByProject(tracked, now).reduce((sum, x) => sum + x.ms, 0) },
-    byProject: totalsByProject(tracked, now)
+    // One line per project, however fragmented the day was: a five-session day still reads
+    // as one row, which is the whole point of grouping rather than listing sessions.
+    today: {
+      total: todayByProject.reduce((sum, entry) => sum + entry.ms, 0),
+      byProject: todayByProject
+    },
+    week: { total: totalsByProject(tracked, now).reduce((sum, x) => sum + x.ms, 0) }
   }
 }
 
@@ -90,10 +103,50 @@ export function buildTrackingMenuItems(
   }
 
   items.push({ type: 'separator' })
-  items.push({
-    label: `Today: ${formatDuration(state.today.total)}  ·  This week: ${formatDuration(state.week.total)}`,
-    enabled: false
-  })
+  // Today has its own section further down the menu now; repeating it here would be the
+  // same number twice, so this line keeps only the reading that section does not carry.
+  items.push({ label: `This week: ${formatDuration(state.week.total)}`, enabled: false })
+
+  return items
+}
+
+/**
+ * The day's tracked time, grouped by project — the summary half of the tray, which sits
+ * below the agenda rows rather than up with the start/stop controls: it answers "how much
+ * have I tracked today", which is a menu-bar question, but it is not an agenda row.
+ *
+ * Returns nothing at all when there is nothing to say, so the menu does not carry an empty
+ * heading around: no tracker installed, or a day with no tracked time yet.
+ */
+export function buildTrackingSummaryItems(state) {
+  if (!state?.detected) return []
+
+  const { total, byProject } = state.today
+  if (!byProject.length) return []
+
+  // A native menu draws in a proportional font, so this cannot truly align columns; padding
+  // to the longest name still keeps short and long project names from reading as a ragged
+  // list, and costs nothing when they are all a similar length.
+  const width = Math.max(...byProject.map((entry) => entry.project.length))
+
+  const items = [{ label: `Tracked today · ${formatDuration(total)}`, enabled: false }]
+
+  for (const entry of byProject) {
+    items.push({
+      label: `    ${entry.project.padEnd(width)}   ${formatDuration(entry.ms)}`,
+      enabled: false
+    })
+  }
+
+  // The open session gets a line of its own so the menu answers "am I still tracking?"
+  // without arithmetic. A native menu cannot animate, so `●` stands in for the pulsing dot
+  // the grid and sidebar use (#9).
+  if (state.running) {
+    items.push({
+      label: `    ● ${state.running.project}  running · ${formatDuration(state.running.elapsedMs)}`,
+      enabled: false
+    })
+  }
 
   return items
 }

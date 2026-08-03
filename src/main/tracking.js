@@ -42,7 +42,7 @@ export function createTrackingController({
     const anchor = new Date(now())
     // One week-wide read backs the running timer, today's total and the week's total, so
     // the tray can never disagree with itself.
-    const { events } = await fetchEvents(
+    const { events, statuses } = await fetchEvents(
       startOfWeek(anchor, WEEK_OPTIONS).toISOString(),
       endOfWeek(anchor, WEEK_OPTIONS).toISOString(),
       { dataDir }
@@ -51,6 +51,9 @@ export function createTrackingController({
     return buildTrackingState({
       events,
       projects: await readProjects(dataDir),
+      // The same "no tracker installed" signal the sidebar and Settings read, so the tray's
+      // summary section disappears for the same reason the grid's lane does.
+      detected: (statuses ?? []).every((status) => status.detected !== false),
       now: now()
     })
   }
