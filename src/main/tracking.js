@@ -97,6 +97,12 @@ export function createTrackingController({
       return result
     },
 
+    async deleteSession(entryId) {
+      const result = await writer().deleteEntry(entryId)
+      afterWrite()
+      return result
+    },
+
     async getRunning() {
       const entry = await writer().getRunningEntry()
       return entry ? { project: entry.project, startMs: entry.start * 1000 } : null

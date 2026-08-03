@@ -125,6 +125,9 @@ export function registerIpcHandlers({
       tracking.updateNote(Number(noteId), String(text ?? ''))
     )
     ipcMain.handle('tracking:deleteNote', (_event, noteId) => tracking.deleteNote(Number(noteId)))
+    ipcMain.handle('tracking:deleteSession', (_event, entryId) =>
+      tracking.deleteSession(Number(entryId))
+    )
   }
   ipcMain.handle('tracking:openNoteWindow', () => {
     openNoteWindow()

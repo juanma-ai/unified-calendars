@@ -21,6 +21,7 @@ function createController({ dataDir = '/tmp/tracker-a' } = {}) {
         addNoteToEntry: async (entryId, text) => ({ entryId, text }),
         updateNote: async (noteId, text) => ({ noteId, text }),
         deleteNote: async (noteId) => ({ noteId }),
+        deleteEntry: async (entryId) => ({ entryId, project: 'certification' }),
         getRunningEntry: async () => ({ id: 1, project: 'certification', start: 100 })
       }
     },
@@ -63,6 +64,18 @@ test('session note writes reach the writer with their ids intact', async () => {
   assert.deepEqual(await controller.addSessionNote(42, 'a'), { entryId: 42, text: 'a' })
   assert.deepEqual(await controller.updateNote(5, 'b'), { noteId: 5, text: 'b' })
   assert.deepEqual(await controller.deleteNote(5), { noteId: 5 })
+})
+
+test('deleting a session invalidates the cache and passes the result through', async () => {
+  // A deleted session still on the grid for the aggregator's 30s TTL would look like the
+  // delete silently failed.
+  const { controller, invalidated } = createController()
+
+  assert.deepEqual(await controller.deleteSession(42), {
+    entryId: 42,
+    project: 'certification'
+  })
+  assert.deepEqual(invalidated, ['timetracker'])
 })
 
 test('reads that do not mutate leave the cache alone', async () => {

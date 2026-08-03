@@ -476,6 +476,11 @@ export function createDevBrowserApi() {
       event.notes = event.notes.filter((entry) => entry !== note)
       return { noteId }
     },
+    deleteSession: async (entryId) => {
+      const event = findTrackedEvent(entryId)
+      events.splice(events.indexOf(event), 1)
+      return { entryId: Number(entryId) }
+    },
     closeNoteWindow: async () => {},
 
     listProjects: async () => [...mockProjects],
