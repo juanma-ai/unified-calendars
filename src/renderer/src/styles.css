@@ -1765,3 +1765,54 @@ input {
   color: #8d8d8d;
   font-size: 11px;
 }
+
+/* Tracker project management (Settings → Connections → Time Tracker) */
+
+.settings-projects {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ededed;
+}
+
+.settings-projects__title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-projects__list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-projects__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.settings-projects__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-projects__add,
+.settings-projects__rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-projects__add .components-base-control,
+.settings-projects__rename .components-base-control {
+  flex: 1 1 auto;
+}

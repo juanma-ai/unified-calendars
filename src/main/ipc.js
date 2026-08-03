@@ -90,7 +90,26 @@ function rescheduleEventNotifications(preferences) {
   eventNotificationScheduler.schedule(lastNotificationEvents, preferences)
 }
 
-export function registerIpcHandlers({ tracking = null, openNoteWindow = () => {}, closeNoteWindow = () => {} } = {}) {
+export function registerIpcHandlers({
+  tracking = null,
+  projects = null,
+  launchAtLogin = null,
+  openNoteWindow = () => {},
+  closeNoteWindow = () => {}
+} = {}) {
+  if (projects) {
+    ipcMain.handle('projects:list', () => projects.list())
+    ipcMain.handle('projects:add', (_event, name) => projects.add(String(name ?? '')))
+    ipcMain.handle('projects:remove', (_event, name) => projects.remove(String(name ?? '')))
+    ipcMain.handle('projects:rename', (_event, from, to) =>
+      projects.rename(String(from ?? ''), String(to ?? ''))
+    )
+  }
+  if (launchAtLogin) {
+    ipcMain.handle('app:getLaunchAtLogin', () => launchAtLogin.get())
+    ipcMain.handle('app:setLaunchAtLogin', (_event, enabled) => launchAtLogin.set(Boolean(enabled)))
+  }
+
   if (tracking) {
     ipcMain.handle('tracking:getRunning', () => tracking.getRunning())
     ipcMain.handle('tracking:start', (_event, project) => tracking.start(String(project ?? '')))

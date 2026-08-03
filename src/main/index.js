@@ -6,12 +6,15 @@ import { getCalendarPreferences } from './calendarPreferences.js'
 import { registerIpcHandlers, scheduleEventNotifications } from './ipc.js'
 import { createMenuBarAgenda } from './menuBarAgenda.js'
 import { createTrackingController } from './tracking.js'
+import { createProjectAdmin } from './trackingProjects.js'
+import { renameCalendarPreferences } from './calendarPreferences.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 let mainWindow = null
 let noteWindow = null
 let menuBarAgenda = null
 let tracking = null
+let projects = null
 
 function createWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -86,7 +89,25 @@ function createNoteWindow() {
 
 app.whenReady().then(() => {
   tracking = createTrackingController({ invalidateCache: invalidateSourceCache })
-  registerIpcHandlers({ tracking, openNoteWindow: createNoteWindow, closeNoteWindow: () => noteWindow?.close() })
+  projects = createProjectAdmin({
+    renamePreferences: renameCalendarPreferences,
+    invalidateCache: invalidateSourceCache
+  })
+  registerIpcHandlers({
+    tracking,
+    projects,
+    // macOS is the source of truth for a login item, so read it back rather than keeping
+    // a preference that could drift from what System Settings actually has.
+    launchAtLogin: {
+      get: () => app.getLoginItemSettings().openAtLogin,
+      set: (openAtLogin) => {
+        app.setLoginItemSettings({ openAtLogin })
+        return app.getLoginItemSettings().openAtLogin
+      }
+    },
+    openNoteWindow: createNoteWindow,
+    closeNoteWindow: () => noteWindow?.close()
+  })
   createWindow()
   menuBarAgenda = createMenuBarAgenda({
     app,

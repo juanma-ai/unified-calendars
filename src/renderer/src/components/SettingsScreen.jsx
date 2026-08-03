@@ -7,6 +7,7 @@ import {
   FlexBlock,
   FlexItem,
   CheckboxControl,
+  TextControl,
   Notice,
   SearchControl,
   TabPanel
@@ -149,6 +150,188 @@ function pluralize(count, noun) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
 
+
+/**
+ * Projects used to live only in projects.txt, edited by hand through the SwiftBar
+ * plugin's "Edit projects…" item. The plugin is being retired, so this is now the only
+ * way to manage them.
+ */
+function TrackerProjects({ onSourceDataChanged }) {
+  const [projects, setProjects] = useState(null)
+  const [draft, setDraft] = useState('')
+  const [renaming, setRenaming] = useState(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    window.calendarAPI
+      .listProjects()
+      .then((list) => active && setProjects(list))
+      .catch((err) => active && setError(getIpcErrorMessage(err)))
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const run = (action) => {
+    setBusy(true)
+    setError(null)
+    return action()
+      .then((list) => {
+        setProjects(list)
+        // A rename rewrites past entries and their calendar id, so the grid has to be
+        // repopulated for the blocks to keep their colour and their name.
+        onSourceDataChanged?.()
+        return list
+      })
+      .catch((err) => setError(getIpcErrorMessage(err)))
+      .finally(() => setBusy(false))
+  }
+
+  const submitAdd = (event) => {
+    event.preventDefault()
+    if (!draft.trim()) return
+    run(() => window.calendarAPI.addProject(draft)).then(() => setDraft(''))
+  }
+
+  const submitRename = (event) => {
+    event.preventDefault()
+    const from = renaming
+    run(() => window.calendarAPI.renameProject(from, renameDraft)).then(() => setRenaming(null))
+  }
+
+  if (!projects) return null
+
+  return (
+    <div className="settings-projects">
+      <h3 className="settings-projects__title">Projects</h3>
+
+      {error && (
+        <Notice status="error" isDismissible onRemove={() => setError(null)}>
+          {error}
+        </Notice>
+      )}
+
+      {projects.length === 0 && (
+        <p className="settings-timetracker__note">
+          No projects yet. Add one to start tracking against it.
+        </p>
+      )}
+
+      <ul className="settings-projects__list">
+        {projects.map((project) => (
+          <li className="settings-projects__row" key={project}>
+            {renaming === project ? (
+              <form className="settings-projects__rename" onSubmit={submitRename}>
+                <TextControl
+                  __nextHasNoMarginBottom
+                  label={`New name for ${project}`}
+                  hideLabelFromVision
+                  value={renameDraft}
+                  onChange={setRenameDraft}
+                  autoFocus
+                />
+                <Button variant="primary" size="small" type="submit" disabled={busy}>
+                  Save
+                </Button>
+                <Button variant="tertiary" size="small" onClick={() => setRenaming(null)}>
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              <>
+                <span className="settings-projects__name">{project}</span>
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  disabled={busy}
+                  onClick={() => {
+                    setRenaming(project)
+                    setRenameDraft(project)
+                  }}
+                >
+                  Rename
+                </Button>
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  isDestructive
+                  disabled={busy}
+                  onClick={() => run(() => window.calendarAPI.removeProject(project))}
+                >
+                  Remove
+                </Button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <form className="settings-projects__add" onSubmit={submitAdd}>
+        <TextControl
+          __nextHasNoMarginBottom
+          label="Add a project"
+          hideLabelFromVision
+          placeholder="New project"
+          value={draft}
+          onChange={setDraft}
+        />
+        <Button variant="secondary" type="submit" disabled={busy || !draft.trim()}>
+          Add
+        </Button>
+      </form>
+
+      <p className="settings-timetracker__note">
+        Removing a project only stops it being offered — past sessions keep their name and
+        stay on the calendar. Renaming moves them, their notes file and their colour with it.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * The timer lives in the menu bar, so it is only there if the app is. This replaces
+ * SwiftBar starting with the machine.
+ */
+function LaunchAtLogin() {
+  const [enabled, setEnabled] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    window.calendarAPI
+      .getLaunchAtLogin()
+      .then((value) => active && setEnabled(value))
+      .catch(() => active && setEnabled(false))
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (enabled === null) return null
+
+  return (
+    <div className="settings-projects">
+      <CheckboxControl
+        __nextHasNoMarginBottom
+        label="Open Unified Calendar at login"
+        help="The timer is in the menu bar, so it is only available while the app is running. Packaged builds only."
+        checked={enabled}
+        onChange={(next) => {
+          setError(null)
+          window.calendarAPI
+            .setLaunchAtLogin(next)
+            .then(setEnabled)
+            .catch((err) => setError(getIpcErrorMessage(err)))
+        }}
+      />
+      {error && <p className="settings-timetracker__stats">{error}</p>}
+    </div>
+  )
+}
+
 /**
  * The time tracker has nothing to authenticate, so its card explains where the data comes
  * from instead of offering a Connect button. The stats come from `timetracker:getStats`
@@ -238,8 +421,8 @@ function TimeTrackerCard({ statuses, onSourceDataChanged }) {
             )}
             {stats?.lastError && <p className="settings-timetracker__stats">{stats.lastError}</p>}
             <p className="settings-timetracker__note">
-              The tracker keeps writing to its own folder. This only changes where the calendar
-              reads from.
+              The calendar reads and writes this database. Point it somewhere else and both
+              follow — sessions started from the menu bar land in the folder shown here.
             </p>
           </FlexBlock>
           <FlexItem>
@@ -248,6 +431,8 @@ function TimeTrackerCard({ statuses, onSourceDataChanged }) {
             </Button>
           </FlexItem>
         </Flex>
+        {detected && <TrackerProjects onSourceDataChanged={onSourceDataChanged} />}
+        <LaunchAtLogin />
       </CardBody>
     </Card>
   )

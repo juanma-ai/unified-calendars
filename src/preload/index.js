@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('calendarAPI', {
   stopTracking: () => ipcRenderer.invoke('tracking:stop'),
   addTrackingNote: (text) => ipcRenderer.invoke('tracking:addNote', text),
   closeNoteWindow: () => ipcRenderer.invoke('tracking:closeNoteWindow'),
+  listProjects: () => ipcRenderer.invoke('projects:list'),
+  addProject: (name) => ipcRenderer.invoke('projects:add', name),
+  removeProject: (name) => ipcRenderer.invoke('projects:remove', name),
+  renameProject: (from, to) => ipcRenderer.invoke('projects:rename', from, to),
+  getLaunchAtLogin: () => ipcRenderer.invoke('app:getLaunchAtLogin'),
+  setLaunchAtLogin: (enabled) => ipcRenderer.invoke('app:setLaunchAtLogin', enabled),
   setCalendarColor: (calendarId, color) =>
     ipcRenderer.invoke('preferences:setCalendarColor', calendarId, color),
   setCalendarSidebarVisibility: (calendarId, visible) =>

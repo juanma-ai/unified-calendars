@@ -423,6 +423,22 @@ export function createDevBrowserApi() {
     },
     closeNoteWindow: async () => {},
 
+    listProjects: async () => [...mockProjects],
+    addProject: async (name) => {
+      mockProjects.push(name.trim())
+      return [...mockProjects]
+    },
+    removeProject: async (name) => {
+      mockProjects = mockProjects.filter((project) => project !== name)
+      return [...mockProjects]
+    },
+    renameProject: async (from, to) => {
+      mockProjects = mockProjects.map((project) => (project === from ? to.trim() : project))
+      return [...mockProjects]
+    },
+    getLaunchAtLogin: async () => false,
+    setLaunchAtLogin: async (enabled) => enabled,
+
     setCalendarColor: async (calendarId, color) => {
       preferences.calendarColors[calendarId] = color
       return snapshot()
@@ -474,6 +490,8 @@ export function createDevBrowserApi() {
  * Installs the mock only when the preload did not run. Returns whether it installed,
  * so the caller can tell "browser, mocked" from "Electron, real bridge".
  */
+let mockProjects = ['certification', 'admin']
+
 export function installDevBrowserMock(target = globalThis) {
   if (target.calendarAPI) return false
 

@@ -59,6 +59,35 @@ export function createCalendarPreferencesStore(storage) {
       return get()
     },
 
+    /**
+     * Move every preference keyed by a calendar id when that id changes. Renaming a
+     * tracker project changes its calendarId, and without this the project silently loses
+     * its colour and its hide/show state — the preferences would still be filed under a
+     * calendar that no longer exists.
+     */
+    renameCalendar(oldId, newId) {
+      if (!oldId || !newId || oldId === newId) return get()
+      const preferences = get()
+
+      for (const map of [
+        preferences.calendarColors,
+        preferences.calendarVisibility,
+        preferences.calendarSidebarVisibility
+      ]) {
+        if (Object.prototype.hasOwnProperty.call(map, oldId)) {
+          map[newId] = map[oldId]
+          delete map[oldId]
+        }
+      }
+
+      preferences.hiddenCalendars = preferences.hiddenCalendars.map((id) =>
+        id === oldId ? newId : id
+      )
+
+      save(preferences)
+      return get()
+    },
+
     setSourceEnabled(source, enabled) {
       const preferences = get()
       preferences.sourceEnabled[source] = enabled
@@ -117,6 +146,8 @@ export const setCalendarSidebarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarSidebarVisibility(calendarId, visible)
 export const setCalendarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarVisibility(calendarId, visible)
+export const renameCalendarPreferences = (oldId, newId) =>
+  getDefaultStore().renameCalendar(oldId, newId)
 export const setSourceEnabled = (source, enabled) =>
   getDefaultStore().setSourceEnabled(source, enabled)
 export const setTimetrackerDataDir = (dataDir) =>
