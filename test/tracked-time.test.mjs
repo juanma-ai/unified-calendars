@@ -5,7 +5,9 @@ import {
   durationMs,
   effectiveEnd,
   formatDuration,
+  isLongSession,
   isRunning,
+  LONG_SESSION_MS,
   totalTrackedMs,
   totalsByProject
 } from '../src/renderer/src/trackedTime.js'
@@ -79,4 +81,19 @@ test('totals ignore non-tracked events, so they always match what is on screen',
   )
 
   assert.equal(formatDuration(total), '30m')
+})
+
+test('a session past 12h is flagged, and a finished one never is', () => {
+  const overnight = tracked({ start: NOW - LONG_SESSION_MS - 60_000, running: true })
+  assert.equal(isLongSession(overnight, NOW), true)
+
+  const justUnder = tracked({ start: NOW - LONG_SESSION_MS + 60_000, running: true })
+  assert.equal(isLongSession(justUnder, NOW), false, 'the threshold is a warning, not a rounding')
+
+  // A finished 14h session is a fact about the past, not a timer someone forgot to stop —
+  // there is nothing to warn about and nothing left to do.
+  const longButClosed = tracked({ start: NOW - 14 * 60 * 60_000, end: NOW })
+  assert.equal(isLongSession(longButClosed, NOW), false)
+
+  assert.equal(isLongSession(undefined, NOW), false)
 })

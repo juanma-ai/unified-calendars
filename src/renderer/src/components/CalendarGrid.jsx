@@ -1,5 +1,5 @@
 import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
 import { TrackedSessionBar } from './TrackedSessionBar.jsx'
 import { formatViewLabel, getViewDays } from '../calendarViews.js'
@@ -12,10 +12,9 @@ import {
   SNAP_MINUTES
 } from '../calendarTimeGrid.js'
 import { getEventColor, isSourceEnabled } from '../calendarViewModel.js'
-import { durationMs, effectiveEnd, isRunning, formatDuration } from '../trackedTime.js'
+import { durationMs, effectiveEnd, isLongSession, isRunning, formatDuration } from '../trackedTime.js'
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
-const CURRENT_TIME_REFRESH_MS = 60 * 1000
 // Below this, a pointer gesture is the click that opens the event menu, not a drag.
 const DRAG_THRESHOLD_PX = 4
 
@@ -48,8 +47,11 @@ function getTrackedLabel(event, now) {
   const start = format(new Date(event.start), 'HH:mm')
   const end = isRunning(event) ? 'now' : format(new Date(effectiveEnd(event, now)), 'HH:mm')
   const separator = isRunning(event) ? ' – ' : '–'
+  // The bar's stripes say "this looks wrong" but cannot say why, and nothing else on the
+  // grid names the suspicion — so the label spells it out for a mouse and a screen reader.
+  const warning = isLongSession(event, now) ? ' · over 12h — forgot to stop?' : ''
 
-  return `${event.title} · ${start}${separator}${end} · ${formatDuration(durationMs(event, now))}`
+  return `${event.title} · ${start}${separator}${end} · ${formatDuration(durationMs(event, now))}${warning}`
 }
 
 function getPreviewGeometry(times) {
@@ -69,6 +71,7 @@ export function CalendarGrid({
   calendarView,
   canEditEvent = () => false,
   events,
+  now: nowMs,
   onEventTimeChange,
   onHideEvent,
   preferences,
@@ -78,7 +81,9 @@ export function CalendarGrid({
   const viewportRef = useRef(null)
   const todayRef = useRef(null)
   const timeScrollRef = useRef(null)
-  const [now, setNow] = useState(() => new Date())
+  // The grid used to keep its own minute timer for the current-time line. It now shares the
+  // app's clock, so the line and a running session's bar move on the same tick.
+  const now = useMemo(() => new Date(nowMs), [nowMs])
   // `drag` drives the preview render; `dragRef` holds the gesture bookkeeping so
   // pointermove never reads state that has not committed yet.
   const [drag, setDrag] = useState(null)
@@ -95,11 +100,6 @@ export function CalendarGrid({
       timeScrollRef.current.scrollTop = getCenteredTimeScrollTop(new Date(), timeScrollRef.current.clientHeight)
     }
   }, [anchorDate, calendarView])
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), CURRENT_TIME_REFRESH_MS)
-    return () => clearInterval(interval)
-  }, [])
 
   const cancelDrag = useCallback(() => {
     dragRef.current = null
@@ -403,7 +403,8 @@ export function CalendarGrid({
                               color={color}
                               event={event}
                               key={event.id}
-                              label={getTrackedLabel(event, now.getTime())}
+                              label={getTrackedLabel(event, nowMs)}
+                              long={isLongSession(event, nowMs)}
                               onHideEvent={onHideEvent}
                               running={isRunning(event)}
                               sessionActions={sessionActions}

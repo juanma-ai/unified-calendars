@@ -40,6 +40,18 @@ export function durationMs(event, now = Date.now()) {
 }
 
 /**
+ * The tracker warned past 12h because a timer left running overnight is the common failure,
+ * and it is the one case where the honest drawing is the misleading one: a bar twelve hours
+ * tall reads as twelve hours of work rather than as a mistake. The threshold lives here so
+ * the tray's warning and the grid's flag cannot drift apart.
+ */
+export const LONG_SESSION_MS = 12 * HOUR_MS
+
+export function isLongSession(event, now = Date.now()) {
+  return isRunning(event) && durationMs(event, now) > LONG_SESSION_MS
+}
+
+/**
  * Per-project totals over the tracked events given, descending by time. Callers pass the
  * events already on screen, so hidden projects drop out of the totals for free and the
  * numbers always match what is visible.

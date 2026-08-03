@@ -11,6 +11,7 @@ import { getIpcErrorMessage } from './ipcErrors.js'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendarViewModel.js'
+import { useLiveClock } from './liveClock.js'
 import { DEFAULT_TRACKER_DB_PATH, shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
@@ -43,6 +44,9 @@ export function App() {
   const [screen, setScreen] = useState('calendar')
   const [settingsTab, setSettingsTab] = useState('connections')
   const [actionError, setActionError] = useState(null)
+  // Shared by every surface that draws a running session, so the grid bar, the sidebar line
+  // and the popover pill can never be showing three different minutes.
+  const now = useLiveClock()
 
   const openSettings = useCallback((tab = 'connections') => {
     setSettingsTab(tab)
@@ -328,6 +332,7 @@ export function App() {
           calendarCountBySource={calendarCountBySource}
           calendarView={calendarView}
           hiddenEventCount={preferences.hiddenEvents.length}
+          now={now}
           onColorChange={handleCalendarColor}
           onOpenSettings={openSettings}
           onSourceEnabledChange={handleSourceEnabled}
@@ -382,6 +387,7 @@ export function App() {
               calendarView={calendarView}
               canEditEvent={canEditEvent}
               events={visibleEvents}
+              now={now}
               onEventTimeChange={handleEventTimeChange}
               onHideEvent={handleHideEvent}
               preferences={preferences}
