@@ -330,7 +330,12 @@ export function App() {
             />
           )}
           {calendarView === 'year' && (
-            <YearView anchorDate={anchorDate} events={visibleEvents} onOpenDay={openDay} />
+            <YearView
+              anchorDate={anchorDate}
+              events={visibleEvents}
+              onOpenDay={openDay}
+              preferences={preferences}
+            />
           )}
           {/* Only the day/week time grid draws tracked lane bars, so only it needs the key. */}
           {(calendarView === 'day' || calendarView === 'week') &&

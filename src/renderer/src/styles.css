@@ -1882,3 +1882,41 @@ input {
 .settings-projects__rename .components-base-control {
   flex: 1 1 auto;
 }
+
+/* Year: which projects were worked on, under the date. The heat colour behind
+ * them is the day's scheduled load, so the dots need a carrier on the darker
+ * levels to stay legible. */
+.calendar-year__month-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.calendar-year__tracked-days {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-year__dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 8px;
+  margin-top: 2px;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+.calendar-year__day.is-level-3 .calendar-year__dots:not(:empty),
+.calendar-year__day.is-level-4 .calendar-year__dots:not(:empty) {
+  background: rgb(255 255 255 / 92%);
+}
+
+.calendar-year__dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}

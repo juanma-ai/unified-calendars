@@ -297,3 +297,40 @@ test('formatTrackedRangeLabel only says "today" when the day view is on today', 
 
   assert.equal(formatTrackedRangeLabel('day', yesterday, anchor), 'Tracked on Wed, Jul 29')
 })
+
+test('year heat stays a scheduled-load reading, with tracked work as project dots', () => {
+  const heatmap = buildYearHeatmap(
+    [
+      { id: 'meeting', start: '2026-07-30T09:00:00+02:00' },
+      ...trackedSessions,
+      {
+        id: 'timetracker:other-month',
+        source: 'timetracker',
+        calendarId: 'timetracker:admin',
+        calendarName: 'admin',
+        title: 'admin',
+        start: '2026-01-15T09:00:00+01:00',
+        end: '2026-01-15T09:30:00+01:00'
+      }
+    ],
+    anchor
+  )
+
+  const busiest = heatmap.months[6].days.find((entry) => ymd(entry.day) === '2026-07-30')
+  // Three sessions on top of one meeting must not read as a four-event day.
+  assert.equal(heatmap.maxCount, 1)
+  assert.deepEqual([busiest.count, busiest.level], [1, 4])
+  // One dot per project, not per session.
+  assert.deepEqual(
+    busiest.trackedProjects.map((entry) => entry.project),
+    ['certification', 'admin']
+  )
+  assert.equal(busiest.trackedProjects[0].event.id, 'timetracker:1')
+
+  const untracked = heatmap.months[6].days.find((entry) => ymd(entry.day) === '2026-07-29')
+  assert.deepEqual(untracked.trackedProjects, [])
+
+  assert.equal(heatmap.months[6].trackedDays, 1)
+  assert.equal(heatmap.months[0].trackedDays, 1)
+  assert.equal(heatmap.months[5].trackedDays, 0)
+})
