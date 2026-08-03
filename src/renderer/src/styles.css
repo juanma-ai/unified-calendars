@@ -1337,7 +1337,7 @@ input {
 }
 
 /* An open session has no end yet, so it is drawn as still going: flat bottom
- * edge, with a dot marking it live. Issue #9 owns the pulse and the counter. */
+ * edge, with a pulsing dot marking it live. */
 .calendar-week__tracked-bar.is-running {
   border-radius: 2px 2px 0 0;
 }
@@ -1351,6 +1351,36 @@ input {
   border-radius: 50%;
   background: #fff;
   transform: translateX(-50%);
+  /* The same keyframes and cadence as the sidebar line and the popover pill: one running
+     session shows up in three places at once, and they should breathe together. */
+  animation: calendar-live-pulse 1.6s ease-in-out infinite;
+}
+
+/* Past 12h the bar stops being a measurement and becomes a question. Stripes over the
+   project colour keep it recognisable as that project's session while making it obviously
+   not ordinary; the label says the rest.
+
+   They are drawn as an overlay rather than as a `background-image`, because the project
+   colour arrives as an inline `background` shorthand — which resets `background-image` to
+   `none` and outranks this rule, so the stripes would silently never appear. */
+.calendar-week__tracked-bar.is-long::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(255 255 255 / 45%) 0,
+    rgb(255 255 255 / 45%) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-week__tracked-live {
+    animation: none;
+  }
 }
 
 /* The bar is the coloured block; this is the transparent control stretched over it that

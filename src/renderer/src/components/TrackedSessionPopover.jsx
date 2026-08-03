@@ -3,6 +3,7 @@ import { Button, TextareaControl } from '@wordpress/components'
 import { closeSmall, edit, trash } from '@wordpress/icons'
 import { format } from 'date-fns'
 
+import { useLiveClock } from '../liveClock.js'
 import { formatRunningLabel, formatSessionRange, getSessionNotes } from '../trackedSession.js'
 import { isRunning } from '../trackedTime.js'
 
@@ -13,8 +14,10 @@ import { isRunning } from '../trackedTime.js'
  * removed. There is still no URL to open and no series, so the only borrowed action is
  * hiding this occurrence.
  *
- * `now` exists so the live-session clock can drive the elapsed counter; without it the card
- * reads the clock once, at render.
+ * The elapsed counter reads the shared live clock rather than a timestamp taken at render,
+ * which is what it used to do: a card left open on a running session sat there insisting the
+ * session was still `1h 12m` old an hour later. `now` stays overridable so the card can be
+ * rendered at a fixed moment in a test.
  */
 export function TrackedSessionPopover({
   event,
@@ -22,8 +25,10 @@ export function TrackedSessionPopover({
   onClose,
   onHideEvent,
   sessionActions,
-  now = Date.now()
+  now: nowOverride
 }) {
+  const liveNow = useLiveClock()
+  const now = nowOverride ?? liveNow
   const running = isRunning(event)
   const notes = getSessionNotes(event)
   // A session whose provider id never survived the read cannot be addressed by a write.

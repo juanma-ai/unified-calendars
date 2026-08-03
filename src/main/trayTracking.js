@@ -1,7 +1,9 @@
-import { durationMs, formatDuration, totalsByProject } from '../shared/trackedTime.js'
-
-// The plugin warned past 12h because a forgotten timer is the common failure.
-const LONG_SESSION_MS = 12 * 60 * 60 * 1000
+import {
+  durationMs,
+  formatDuration,
+  isLongSession,
+  totalsByProject
+} from '../shared/trackedTime.js'
 
 /** Compact `1:23` for the menu bar title, where `1h 23m` is too wide to live. */
 export function formatTrackerClock(ms) {
@@ -31,7 +33,7 @@ export function buildTrackingState({ events = [], projects = [], now = Date.now(
     ? {
         project: runningEvent.calendarName,
         elapsedMs: durationMs(runningEvent, now),
-        isLong: durationMs(runningEvent, now) > LONG_SESSION_MS,
+        isLong: isLongSession(runningEvent, now),
         notes: runningEvent.notes ?? []
       }
     : null
