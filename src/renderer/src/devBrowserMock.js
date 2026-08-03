@@ -320,7 +320,14 @@ function buildStatuses() {
     },
     { source: 'trello', ok: true, lastSyncedAt },
     { source: 'reminders', ok: true, lastSyncedAt },
-    { source: 'timetracker', ok: true, detected: true, lastSyncedAt }
+    {
+      source: 'timetracker',
+      ok: true,
+      detected: true,
+      // The real source reports the folder it read; the legend strip's hint names it.
+      displayPath: '~/.timetracker/timetracker.db',
+      lastSyncedAt
+    }
   ]
 }
 
