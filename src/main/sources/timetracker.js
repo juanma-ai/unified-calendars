@@ -131,10 +131,17 @@ function buildTrackedCalendars(projects, entries) {
   }))
 }
 
+/**
+ * Every status this source reports carries the path it was reading, so the renderer can name
+ * the folder without a second round trip. It rides on the status rather than on an IPC of its
+ * own because the strip that shows it must never disagree with the bars beside it: both come
+ * out of the same fetch, so a folder change moves them together or not at all.
+ */
 export function createTimetrackerSource({
   runQuery,
   readProjects = async () => [],
   detect = async () => true,
+  displayPath = null,
   now = () => Date.now()
 } = {}) {
   return async function fetchTimetrackerEvents(rangeStart, rangeEnd) {
@@ -145,7 +152,7 @@ export function createTimetrackerSource({
       return {
         events: [],
         calendars: [],
-        statuses: [{ source: 'timetracker', ok: true, detected: false }]
+        statuses: [{ source: 'timetracker', ok: true, detected: false, displayPath }]
       }
     }
 
@@ -174,6 +181,7 @@ export function createTimetrackerSource({
             source: 'timetracker',
             ok: true,
             detected: true,
+            displayPath,
             lastSyncedAt: new Date(nowMs).toISOString()
           }
         ]
@@ -183,7 +191,7 @@ export function createTimetrackerSource({
         events: [],
         calendars: [],
         statuses: [
-          { source: 'timetracker', ok: false, detected: true, lastError: err.message }
+          { source: 'timetracker', ok: false, detected: true, displayPath, lastError: err.message }
         ]
       }
     }
@@ -209,6 +217,14 @@ async function readProjectsFile(path) {
   }
 }
 
+/**
+ * `~/.timetracker/timetracker.db` fits inline where `/Users/someone/.timetracker/…` wraps,
+ * both in the Settings card and in the legend strip's hint.
+ */
+export function toDisplayPath(dbPath, home = homedir()) {
+  return dbPath.startsWith(`${home}/`) ? `~${dbPath.slice(home.length)}` : dbPath
+}
+
 export async function fetchTimetrackerEvents(rangeStart, rangeEnd, { dataDir } = {}) {
   const dir = dataDir ?? resolveDataDir()
   const dbPath = join(dir, DB_FILE)
@@ -216,7 +232,8 @@ export async function fetchTimetrackerEvents(rangeStart, rangeEnd, { dataDir } =
   const source = createTimetrackerSource({
     runQuery: createSqliteRunner(dbPath),
     readProjects: () => readProjectsFile(join(dir, PROJECTS_FILE)),
-    detect: () => fileExists(dbPath)
+    detect: () => fileExists(dbPath),
+    displayPath: toDisplayPath(dbPath)
   })
 
   return source(rangeStart, rangeEnd)
@@ -247,14 +264,11 @@ export async function readTimetrackerStats({
   )
   const status = statuses[0] ?? {}
   const dbPath = join(dataDir, DB_FILE)
-  const home = homedir()
 
   return {
     dataDir,
     dbPath,
-    // The card shows the path inline, and `~/.timetracker/timetracker.db` fits where
-    // `/Users/someone/.timetracker/timetracker.db` wraps.
-    displayPath: dbPath.startsWith(`${home}/`) ? `~${dbPath.slice(home.length)}` : dbPath,
+    displayPath: toDisplayPath(dbPath),
     detected: status.detected !== false,
     // `calendars` already merges projects.txt with the projects named by actual entries, so
     // this is the same project count the sidebar lists.

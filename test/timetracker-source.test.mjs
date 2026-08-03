@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createTimetrackerSource } from '../src/main/sources/timetracker.js'
+import { createTimetrackerSource, toDisplayPath } from '../src/main/sources/timetracker.js'
 import { parseProjectsFile, projectColor } from '../src/main/sources/timetrackerProjects.js'
 
 const NOW_MS = Date.UTC(2026, 6, 26, 12, 0, 0)
@@ -166,7 +166,54 @@ test('a missing database reports ok but undetected, so the sidebar stays quiet',
   const result = await fetch(RANGE_START, RANGE_END)
 
   assert.deepEqual(result.events, [])
-  assert.deepEqual(result.statuses, [{ source: 'timetracker', ok: true, detected: false }])
+  assert.deepEqual(result.statuses, [
+    { source: 'timetracker', ok: true, detected: false, displayPath: null }
+  ])
+})
+
+/**
+ * The legend strip names the folder it is reading, and takes that name off the status rather
+ * than off an IPC of its own. It stays on screen while a present tracker fails to read, so
+ * every branch has to carry the path — an undetected tracker has none to carry.
+ */
+test('every status carries the path that was read, so the renderer can name the folder', async () => {
+  const withPath = (options) =>
+    createTimetrackerSource({
+      runQuery: fakeRunQuery(options),
+      detect: async () => options.detected ?? true,
+      displayPath: '~/.timetracker/timetracker.db',
+      now: () => NOW_MS
+    })
+
+  const [ok] = (await withPath({})(RANGE_START, RANGE_END)).statuses
+  assert.equal(ok.displayPath, '~/.timetracker/timetracker.db')
+
+  const [failed] = (
+    await createTimetrackerSource({
+      runQuery: async () => {
+        throw new Error('sqlite3 exited with code 1')
+      },
+      displayPath: '~/.timetracker/timetracker.db',
+      now: () => NOW_MS
+    })(RANGE_START, RANGE_END)
+  ).statuses
+  assert.equal(failed.displayPath, '~/.timetracker/timetracker.db')
+
+  const [undetected] = (await withPath({ detected: false })(RANGE_START, RANGE_END)).statuses
+  assert.equal(undetected.displayPath, '~/.timetracker/timetracker.db')
+})
+
+test('a path under the home directory is shortened, one outside it is left alone', () => {
+  assert.equal(
+    toDisplayPath('/Users/someone/.timetracker/timetracker.db', '/Users/someone'),
+    '~/.timetracker/timetracker.db'
+  )
+  assert.equal(toDisplayPath('/Volumes/work/timetracker.db', '/Users/someone'), '/Volumes/work/timetracker.db')
+  // A sibling directory that merely starts with the home path is not inside it.
+  assert.equal(
+    toDisplayPath('/Users/someone-else/timetracker.db', '/Users/someone'),
+    '/Users/someone-else/timetracker.db'
+  )
 })
 
 test('a query failure on an existing database is reported as a failing source', async () => {

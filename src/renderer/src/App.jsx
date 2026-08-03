@@ -6,10 +6,12 @@ import { CalendarGrid } from './components/CalendarGrid.jsx'
 import { CalendarSidebar } from './components/CalendarSidebar.jsx'
 import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
+import { SourceLegend } from './components/SourceLegend.jsx'
 import { getIpcErrorMessage } from './ipcErrors.js'
 import { YearView } from './components/YearView.jsx'
 import { refreshCalendar } from './refreshCalendar.js'
 import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendarViewModel.js'
+import { DEFAULT_TRACKER_DB_PATH, shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
@@ -91,6 +93,12 @@ export function App() {
     () => events.filter((event) => event.source === 'timetracker'),
     [events]
   )
+  // The folder the last fetch actually read, so the legend's hint follows a Change folder
+  // in Settings. Before the first fetch resolves there is no status to ask; the default is
+  // the same optimistic guess `shouldShowSourceLegend` makes about visibility.
+  const trackerDbPath =
+    statuses.find((status) => status.source === 'timetracker')?.displayPath ??
+    DEFAULT_TRACKER_DB_PATH
 
   const refresh = useCallback(async () => {
     const result = await refreshCalendar(window.calendarAPI, range.start, range.end)
@@ -324,6 +332,11 @@ export function App() {
           {calendarView === 'year' && (
             <YearView anchorDate={anchorDate} events={visibleEvents} onOpenDay={openDay} />
           )}
+          {/* Only the day/week time grid draws tracked lane bars, so only it needs the key. */}
+          {(calendarView === 'day' || calendarView === 'week') &&
+            shouldShowSourceLegend(preferences, statuses) && (
+              <SourceLegend dbPath={trackerDbPath} />
+            )}
           {(calendarView === 'day' || calendarView === 'week') && (
             <CalendarGrid
               anchorDate={anchorDate}
