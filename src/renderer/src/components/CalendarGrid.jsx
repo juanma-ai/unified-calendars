@@ -72,6 +72,7 @@ export function CalendarGrid({
   canEditEvent = () => false,
   events,
   now: nowMs,
+  onCompleteReminder,
   onEventTimeChange,
   onHideEvent,
   preferences,
@@ -301,6 +302,7 @@ export function CalendarGrid({
                     >
                       <EventPill
                         event={event}
+                        onCompleteReminder={onCompleteReminder}
                         onHideEvent={onHideEvent}
                         preferences={preferences}
                         sessionActions={sessionActions}
@@ -370,6 +372,7 @@ export function CalendarGrid({
                         >
                           <EventPill
                             event={event}
+                            onCompleteReminder={onCompleteReminder}
                             onHideEvent={onHideEvent}
                             preferences={preferences}
                             sessionActions={sessionActions}

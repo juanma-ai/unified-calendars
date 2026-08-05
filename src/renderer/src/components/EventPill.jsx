@@ -56,6 +56,7 @@ function lightenHexColor(color, amount = 0.6) {
  */
 export function EventPill({
   event,
+  onCompleteReminder,
   onHideEvent,
   preferences,
   sessionActions,
@@ -133,6 +134,16 @@ export function EventPill({
               }}
             >
               {event.source === 'trello' ? 'Open in Trello' : 'Open in Google Calendar'}
+            </MenuItem>
+          )}
+          {event.source === 'reminders' && onCompleteReminder && (
+            <MenuItem
+              onClick={() => {
+                onCompleteReminder(event)
+                onClose()
+              }}
+            >
+              Mark as complete
             </MenuItem>
           )}
           <MenuItem

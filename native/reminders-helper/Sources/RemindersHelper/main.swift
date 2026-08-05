@@ -9,6 +9,7 @@ func fail(_ message: String) -> Never {
 enum Command {
     case fetch(start: Date, end: Date)
     case setDue(id: String, due: Date)
+    case setCompleted(id: String, completed: Bool)
 }
 
 func parseArgs() -> (command: Command, output: URL?) {
@@ -30,6 +31,7 @@ func parseArgs() -> (command: Command, output: URL?) {
     var end: Date?
     var setDueId: String?
     var due: Date?
+    var completedChange: (id: String, completed: Bool)?
     var output: URL?
     var iterator = CommandLine.arguments.dropFirst().makeIterator()
 
@@ -55,6 +57,16 @@ func parseArgs() -> (command: Command, output: URL?) {
                 fail("--due requires a valid ISO 8601 value")
             }
             due = date
+        case "--complete":
+            guard let value = iterator.next(), !value.isEmpty else {
+                fail("--complete requires a reminder identifier")
+            }
+            completedChange = (id: value, completed: true)
+        case "--uncomplete":
+            guard let value = iterator.next(), !value.isEmpty else {
+                fail("--uncomplete requires a reminder identifier")
+            }
+            completedChange = (id: value, completed: false)
         case "--output":
             guard let value = iterator.next(), !value.isEmpty else {
                 fail("--output requires a file path")
@@ -70,9 +82,14 @@ func parseArgs() -> (command: Command, output: URL?) {
         return (.setDue(id: setDueId, due: due), output)
     }
 
+    if let completedChange {
+        return (.setCompleted(id: completedChange.id, completed: completedChange.completed), output)
+    }
+
     guard let start, let end else {
         fail("Usage: reminders-helper --start <ISO8601> --end <ISO8601>"
-            + " | --set-due <id> --due <ISO8601>")
+            + " | --set-due <id> --due <ISO8601>"
+            + " | --complete <id> | --uncomplete <id>")
     }
     return (.fetch(start: start, end: end), output)
 }
@@ -176,6 +193,26 @@ case let .setDue(id, due):
         : [.year, .month, .day, .hour, .minute, .second]
     let components = Calendar.current.dateComponents(fields, from: due)
     reminder.dueDateComponents = components
+
+    do {
+        try store.save(reminder, commit: true)
+    } catch {
+        fail("save-failed: \(error.localizedDescription)")
+    }
+
+    guard let saved = reminder.dueDateComponents,
+          let savedDate = Calendar.current.date(from: saved) else {
+        fail("save-failed: reminder has no due date after saving")
+    }
+
+    writeOutput(makeReminderOut(reminder, components: saved, date: savedDate), to: outputURL)
+
+case let .setCompleted(id, completed):
+    guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else {
+        fail("not-found: no reminder with identifier \(id)")
+    }
+
+    reminder.isCompleted = completed
 
     do {
         try store.save(reminder, commit: true)

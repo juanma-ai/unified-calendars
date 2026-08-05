@@ -402,6 +402,8 @@ export function createDevBrowserApi() {
       .sort((a, b) => new Date(a.start) - new Date(b.start))
   }
 
+  const completedReminderEntries = new Map()
+
   return {
     getUnifiedEvents: async (rangeStart, rangeEnd) => eventsInRange(rangeStart, rangeEnd),
     getCachedEvents: async () => ({
@@ -428,6 +430,26 @@ export function createDevBrowserApi() {
         entry.id === event.id ? { ...entry, start, end: end ?? entry.end } : entry
       )
       return { ok: true }
+    },
+
+    // The real fetch drops completed reminders, so completing removes the entry and
+    // undo puts the same object back — mirroring invalidate-then-refresh behaviour.
+    setReminderCompleted: async ({ event, completed }) => {
+      if (event?.source !== 'reminders') {
+        throw new Error('Completing is only supported for reminders.')
+      }
+      if (completed) {
+        const entry = events.find(({ id }) => id === event.id)
+        events = events.filter(({ id }) => id !== event.id)
+        if (entry) completedReminderEntries.set(event.id, entry)
+        return entry ?? event
+      }
+      const entry = completedReminderEntries.get(event.id)
+      if (entry) {
+        events = [...events, entry]
+        completedReminderEntries.delete(event.id)
+      }
+      return entry ?? event
     },
 
     startGoogleOAuth: () => browserOnly('Conectar con Google'),
