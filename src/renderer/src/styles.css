@@ -2004,3 +2004,29 @@ input {
   height: 4px;
   border-radius: 50%;
 }
+
+/* Transient action feedback (completing a reminder). Floats over the calendar instead of
+   reflowing it, and clears the sidebar so it never covers the source-status footer. */
+
+.calendar-snackbars {
+  position: fixed;
+  bottom: 20px;
+  left: 340px;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+@media (max-width: 1100px) {
+  .calendar-snackbars {
+    left: 292px;
+  }
+}
+
+.calendar-snackbars .components-snackbar {
+  pointer-events: auto;
+  max-width: 480px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Notice } from '@wordpress/components'
+import { Notice, Snackbar } from '@wordpress/components'
 import { AgendaView } from './components/AgendaView.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { CalendarGrid } from './components/CalendarGrid.jsx'
@@ -44,6 +44,9 @@ export function App() {
   const [screen, setScreen] = useState('calendar')
   const [settingsTab, setSettingsTab] = useState('connections')
   const [actionError, setActionError] = useState(null)
+  // The last reminder completed from a pill, kept so the snackbar can offer
+  // Undo. Completing another reminder replaces the pending undo.
+  const [completedReminder, setCompletedReminder] = useState(null)
   // Shared by every surface that draws a running session, so the grid bar, the sidebar line
   // and the popover pill can never be showing three different minutes.
   const now = useLiveClock()
@@ -266,6 +269,34 @@ export function App() {
     [runSessionWrite]
   )
 
+  const handleCompleteReminder = useCallback(
+    async (event) => {
+      setActionError(null)
+      try {
+        await window.calendarAPI.setReminderCompleted({ event, completed: true })
+        await refresh()
+        setCompletedReminder(event)
+      } catch (error) {
+        setActionError(getIpcErrorMessage(error))
+      }
+    },
+    [refresh]
+  )
+
+  const handleUndoCompleteReminder = useCallback(
+    async (event) => {
+      setCompletedReminder(null)
+      setActionError(null)
+      try {
+        await window.calendarAPI.setReminderCompleted({ event, completed: false })
+        await refresh()
+      } catch (error) {
+        setActionError(getIpcErrorMessage(error))
+      }
+    },
+    [refresh]
+  )
+
   const handleRestoreHiddenEvent = useCallback((key) => {
     window.calendarAPI.restoreHiddenEvent(key).then(setPreferences)
   }, [])
@@ -355,6 +386,7 @@ export function App() {
             <MonthView
               anchorDate={anchorDate}
               events={visibleEvents}
+              onCompleteReminder={handleCompleteReminder}
               onHideEvent={handleHideEvent}
               onOpenDay={openDay}
               preferences={preferences}
@@ -365,6 +397,7 @@ export function App() {
             <AgendaView
               anchorDate={anchorDate}
               events={visibleEvents}
+              onCompleteReminder={handleCompleteReminder}
               onHideEvent={handleHideEvent}
               preferences={preferences}
               sessionActions={sessionActions}
@@ -390,6 +423,7 @@ export function App() {
               canEditEvent={canEditEvent}
               events={visibleEvents}
               now={now}
+              onCompleteReminder={handleCompleteReminder}
               onEventTimeChange={handleEventTimeChange}
               onHideEvent={handleHideEvent}
               preferences={preferences}
@@ -398,6 +432,23 @@ export function App() {
           )}
         </main>
       </div>
+      {/* Floats over the grid instead of pushing it down: completing is transient and the
+          undo window closes itself after ten seconds. */}
+      {completedReminder && (
+        <div className="calendar-snackbars">
+          <Snackbar
+            actions={[
+              {
+                label: 'Undo',
+                onClick: () => handleUndoCompleteReminder(completedReminder)
+              }
+            ]}
+            onRemove={() => setCompletedReminder(null)}
+          >
+            Completed “{completedReminder.title}”
+          </Snackbar>
+        </div>
+      )}
     </div>
   )
 }

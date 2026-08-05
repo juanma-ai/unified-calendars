@@ -75,6 +75,13 @@ export async function updateReminderDue(event, { start }) {
   return mapReminder(item)
 }
 
+// Completing is not a time mutation, so it gets its own write path instead of
+// piggybacking on updateReminderDue. Undo is the same call with the inverse flag.
+export async function setReminderCompleted(event, completed) {
+  const item = await runHelper([completed ? '--complete' : '--uncomplete', event.providerEventId])
+  return mapReminder(item)
+}
+
 export async function fetchRemindersEvents(rangeStart, rangeEnd) {
   try {
     const items = await runHelper(['--start', rangeStart, '--end', rangeEnd])

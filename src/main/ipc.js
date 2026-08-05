@@ -8,7 +8,7 @@ import {
 } from './aggregator.js'
 import { config } from './config.js'
 import { disconnectGoogleAccount, startOAuthFlow, updateGoogleEventTime } from './sources/google.js'
-import { updateReminderDue } from './sources/reminders.js'
+import { setReminderCompleted, updateReminderDue } from './sources/reminders.js'
 import { updateTrelloCardDue } from './sources/trello.js'
 import { readTimetrackerStats, validateDataDir } from './sources/timetracker.js'
 import { getGoogleAccounts } from './tokenStore.js'
@@ -24,6 +24,7 @@ import {
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
 import { createEventTimeUpdater } from './eventMutations.js'
+import { createReminderCompleter } from './reminderCompletion.js'
 
 const updateEventTime = createEventTimeUpdater(
   {
@@ -31,6 +32,11 @@ const updateEventTime = createEventTimeUpdater(
     trello: updateTrelloCardDue,
     reminders: updateReminderDue
   },
+  invalidateSourceCache
+)
+
+const setReminderCompletedHandler = createReminderCompleter(
+  setReminderCompleted,
   invalidateSourceCache
 )
 
@@ -158,6 +164,10 @@ export function registerIpcHandlers({
 
   ipcMain.handle('calendar:updateEventTime', (_event, payload) => {
     return updateEventTime(payload ?? {})
+  })
+
+  ipcMain.handle('calendar:setReminderCompleted', (_event, payload) => {
+    return setReminderCompletedHandler(payload ?? {})
   })
 
   ipcMain.handle('calendar:startGoogleOAuth', (_event, accountLabel) => {

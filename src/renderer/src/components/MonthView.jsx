@@ -22,6 +22,7 @@ function formatTrackedTooltip(projects) {
 export function MonthView({
   anchorDate,
   events,
+  onCompleteReminder,
   onHideEvent,
   onOpenDay,
   preferences,
@@ -63,6 +64,7 @@ export function MonthView({
               <div className="calendar-month__events">
                 {cell.events.map((event) => (
                   <EventPill
+                    onCompleteReminder={onCompleteReminder}
                     event={event}
                     key={event.id}
                     onHideEvent={onHideEvent}
