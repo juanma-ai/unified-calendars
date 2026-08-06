@@ -8,7 +8,7 @@ function authQuery() {
 }
 
 async function fetchBoards() {
-  const res = await fetch(`${BASE_URL}/members/me/boards?fields=id,name&filter=open&${authQuery()}`)
+  const res = await fetch(`${BASE_URL}/members/me/boards?fields=id,name,url&filter=open&${authQuery()}`)
   if (!res.ok) throw new Error(`Trello boards request failed: ${res.status}`)
 
   const boards = await res.json()
@@ -83,7 +83,9 @@ export async function fetchTrelloEvents(rangeStart, rangeEnd) {
     const calendars = boards.map((board) => ({
       source: 'trello',
       calendarId: `trello:${board.id}`,
+      providerCalendarId: board.id,
       calendarName: board.name,
+      url: board.url,
       calendarDefaultColor: '#9b7a00',
       calendarDefaultVisible: false
     }))
