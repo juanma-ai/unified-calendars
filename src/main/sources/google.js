@@ -201,6 +201,8 @@ export async function fetchGoogleEvents(rangeStart, rangeEnd) {
         sourceAccountId: account.id,
         sourceAccountName: account.label,
         calendarId: `google:${account.id}:${calendarEntry.id}`,
+        providerCalendarId: calendarEntry.id,
+        accountEmail: account.email,
         calendarName: calendarEntry.summaryOverride ?? calendarEntry.summary ?? calendarEntry.id,
         calendarDefaultColor: calendarEntry.backgroundColor ?? '#3858e9',
         calendarDefaultVisible: Boolean(calendarEntry.primary)

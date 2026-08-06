@@ -5,10 +5,12 @@ import {
   DropdownMenu,
   FormToggle,
   MenuGroup,
+  MenuItem,
   SearchControl
 } from '@wordpress/components'
-import { moreVertical } from '@wordpress/icons'
+import { external, moreVertical } from '@wordpress/icons'
 
+import { getCalendarLink } from '../calendarLinks.js'
 import { formatTrackedRangeLabel } from '../calendarViews.js'
 import { formatDuration } from '../trackedTime.js'
 import { buildTrackedSummary, trackedMsByCalendar } from '../trackedSummary.js'
@@ -41,6 +43,7 @@ function getStatusText(status) {
 
 function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const link = getCalendarLink(calendar)
 
   return (
     <div
@@ -77,16 +80,31 @@ function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }
             size: 'small'
           }}
         >
-          {() => (
-            <MenuGroup label="Color">
-              <div className="calendar-color-popover">
-                <ColorPicker
-                  color={calendar.color}
-                  onChange={(color) => onColorChange(calendar.id, color)}
-                  enableAlpha={false}
-                />
-              </div>
-            </MenuGroup>
+          {({ onClose }) => (
+            <>
+              {link && (
+                <MenuGroup>
+                  <MenuItem
+                    icon={external}
+                    onClick={() => {
+                      window.calendarAPI.openExternal(link.url)
+                      onClose()
+                    }}
+                  >
+                    {link.label}
+                  </MenuItem>
+                </MenuGroup>
+              )}
+              <MenuGroup label="Color">
+                <div className="calendar-color-popover">
+                  <ColorPicker
+                    color={calendar.color}
+                    onChange={(color) => onColorChange(calendar.id, color)}
+                    enableAlpha={false}
+                  />
+                </div>
+              </MenuGroup>
+            </>
           )}
         </DropdownMenu>
       </div>

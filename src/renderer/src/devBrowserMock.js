@@ -40,6 +40,8 @@ const CALENDARS = [
     sourceAccountId: 'work',
     sourceAccountName: 'work@example.com',
     calendarId: 'google:work:primary',
+    providerCalendarId: 'work@example.com',
+    accountEmail: 'work@example.com',
     calendarName: 'Work',
     calendarDefaultColor: '#3858e9',
     calendarDefaultVisible: true
@@ -49,6 +51,8 @@ const CALENDARS = [
     sourceAccountId: 'work',
     sourceAccountName: 'work@example.com',
     calendarId: 'google:work:team',
+    providerCalendarId: 'team@group.calendar.google.com',
+    accountEmail: 'work@example.com',
     calendarName: 'Team rituals',
     calendarDefaultColor: '#c5d9ff',
     calendarDefaultVisible: true
@@ -58,6 +62,8 @@ const CALENDARS = [
     sourceAccountId: 'personal',
     sourceAccountName: 'personal@example.com',
     calendarId: 'google:personal:primary',
+    providerCalendarId: 'personal@example.com',
+    accountEmail: 'personal@example.com',
     calendarName: 'Personal',
     calendarDefaultColor: '#1a7f37',
     calendarDefaultVisible: true
@@ -67,6 +73,8 @@ const CALENDARS = [
     sourceAccountId: 'personal',
     sourceAccountName: 'personal@example.com',
     calendarId: 'google:personal:birthdays',
+    providerCalendarId: 'birthdays@group.v.calendar.google.com',
+    accountEmail: 'personal@example.com',
     calendarName: 'Birthdays',
     calendarDefaultColor: '#f5e6a8',
     calendarDefaultVisible: false
@@ -74,6 +82,8 @@ const CALENDARS = [
   {
     source: 'trello',
     calendarId: 'trello:board-roadmap',
+    providerCalendarId: 'board-roadmap',
+    url: 'https://trello.com/b/board-roadmap/roadmap',
     calendarName: 'Roadmap',
     calendarDefaultColor: '#9b7a00',
     calendarDefaultVisible: false

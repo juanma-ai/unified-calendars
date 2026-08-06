@@ -106,6 +106,45 @@ test('builds calendars from the source catalog even when the range has no events
   )
 })
 
+test('carries provider link fields from the catalog into sidebar entries', () => {
+  const catalog = [
+    {
+      source: 'google',
+      sourceAccountId: 'work',
+      calendarId: 'google:work:team@group.calendar.google.com',
+      providerCalendarId: 'team@group.calendar.google.com',
+      accountEmail: 'juanma@example.com',
+      calendarName: 'Team calendar',
+      calendarDefaultColor: '#3858e9',
+      calendarDefaultVisible: true
+    },
+    {
+      source: 'trello',
+      calendarId: 'trello:board-1',
+      providerCalendarId: 'board-1',
+      url: 'https://trello.com/b/board-1/roadmap',
+      calendarName: 'Roadmap',
+      calendarDefaultColor: '#9b7a00',
+      calendarDefaultVisible: false
+    }
+  ]
+
+  const calendars = buildCalendars([], {}, catalog)
+
+  assert.equal(calendars[0].providerCalendarId, 'team@group.calendar.google.com')
+  assert.equal(calendars[0].accountEmail, 'juanma@example.com')
+  assert.equal(calendars[1].url, 'https://trello.com/b/board-1/roadmap')
+})
+
+test('carries providerCalendarId from events when a calendar has no catalog entry', () => {
+  const calendars = buildCalendars(
+    [{ ...events[0], providerCalendarId: 'personal@example.com' }],
+    {}
+  )
+
+  assert.equal(calendars[0].providerCalendarId, 'personal@example.com')
+})
+
 test('separates sidebar membership from quick event visibility', () => {
   const preferences = {
     calendarSidebarVisibility: {
