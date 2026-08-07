@@ -18,6 +18,7 @@ import { buildTrackedSummary, trackedMsByCalendar } from '../trackedSummary.js'
 const SOURCE_LABELS = {
   google: 'Google Calendar',
   trello: 'Trello',
+  linear: 'Linear',
   reminders: 'Reminders',
   timetracker: 'Time Tracker'
 }
@@ -264,12 +265,16 @@ export function CalendarSidebar({
                         'No Google calendars are connected yet.'}
                       {!hasAvailableCalendars && isTrello && 'No Trello boards are available yet.'}
                       {!hasAvailableCalendars &&
+                        source === 'linear' &&
+                        'No Linear issues are available yet.'}
+                      {!hasAvailableCalendars &&
                         isTimetracker &&
                         'No tracked projects yet — start a timer in Time Tracker.'}
                       {!hasAvailableCalendars &&
                         !isGoogle &&
                         !isTrello &&
                         !isTimetracker &&
+                        source !== 'linear' &&
                         'No calendars connected here yet.'}
                     </p>
                     <Button

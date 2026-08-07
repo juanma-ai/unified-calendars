@@ -19,5 +19,9 @@ export function getCalendarLink(calendar) {
     return { label: 'Open board in Trello', url: calendar.url }
   }
 
+  if (calendar?.source === 'linear' && calendar.url) {
+    return { label: 'Open in Linear', url: calendar.url }
+  }
+
   return null
 }

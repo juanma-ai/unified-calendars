@@ -19,6 +19,7 @@ import { getIpcErrorMessage } from '../ipcErrors.js'
 const SOURCE_NAMES = {
   google: 'Google Calendar',
   trello: 'Trello',
+  linear: 'Linear',
   reminders: 'Apple Reminders',
   timetracker: 'Time Tracker'
 }
@@ -137,6 +138,9 @@ function ConnectionCard({ source, statuses }) {
           ))}
         {source === 'trello' && (
           <p>One Trello connection provides every open board the account can access.</p>
+        )}
+        {source === 'linear' && (
+          <p>A read-only personal API key surfaces every issue assigned to you.</p>
         )}
         {source === 'reminders' && (
           <p>Access is controlled by macOS in Privacy &amp; Security → Reminders.</p>
@@ -611,7 +615,7 @@ export function SettingsScreen({
                 onReconnect={onReconnectGoogle}
                 statuses={statuses}
               />
-              {['trello', 'reminders'].map((source) => (
+              {['trello', 'linear', 'reminders'].map((source) => (
                 <ConnectionCard key={source} source={source} statuses={statuses} />
               ))}
               <TimeTrackerCard statuses={statuses} onSourceDataChanged={onSourceDataChanged} />

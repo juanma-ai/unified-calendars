@@ -133,7 +133,11 @@ export function EventPill({
                 onClose()
               }}
             >
-              {event.source === 'trello' ? 'Open in Trello' : 'Open in Google Calendar'}
+              {event.source === 'trello'
+                ? 'Open in Trello'
+                : event.source === 'linear'
+                  ? 'Open in Linear'
+                  : 'Open in Google Calendar'}
             </MenuItem>
           )}
           {event.source === 'reminders' && onCompleteReminder && (

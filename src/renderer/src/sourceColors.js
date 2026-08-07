@@ -1,6 +1,7 @@
 export const SOURCES = [
   { key: 'google', label: 'Google Calendar', color: '#4285f4' },
   { key: 'trello', label: 'Trello', color: '#0079bf' },
+  { key: 'linear', label: 'Linear', color: '#5e6ad2' },
   { key: 'reminders', label: 'Reminders', color: '#ff9500' },
   { key: 'timetracker', label: 'Time Tracker', color: '#00875a' }
 ]

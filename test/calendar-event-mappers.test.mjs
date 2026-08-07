@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapGoogleEvent, mapTrackedEntry, mapTrelloCard } from '../src/main/sources/calendarEventMappers.js'
+import { mapGoogleEvent, mapTrackedEntry, mapTrelloCard, mapLinearIssue } from '../src/main/sources/calendarEventMappers.js'
 
 test('Google events retain calendar and recurring-series identity', () => {
   const event = mapGoogleEvent(
@@ -119,4 +119,46 @@ test('A running entry with a start in the future never produces a negative durat
 
   assert.equal(event.isRunning, true)
   assert.ok(new Date(event.end) >= new Date(event.start))
+})
+
+test('Linear issues carry team identity and are all-day events', () => {
+  const event = mapLinearIssue({
+    id: 'issue-1',
+    identifier: 'DEVREL-1561',
+    title: 'Publish announcement post',
+    dueDate: '2026-08-07',
+    url: 'https://linear.app/a8c/issue/DEVREL-1561',
+    state: { name: 'Todo', type: 'unstarted' },
+    team: { id: 'team-devrel', key: 'DEVREL', name: 'Developer Relations' }
+  })
+
+  assert.equal(event.calendarId, 'linear:team-devrel')
+  assert.equal(event.calendarName, 'Developer Relations')
+  assert.equal(event.calendarDefaultColor, '#5e6ad2')
+  assert.equal(event.calendarDefaultVisible, false)
+  assert.equal(event.id, 'linear:issue-1')
+  assert.equal(event.providerCalendarId, 'team-devrel')
+  assert.equal(event.providerEventId, 'issue-1')
+  assert.equal(event.seriesId, null)
+  assert.equal(event.title, 'DEVREL-1561 Publish announcement post')
+  assert.equal(event.allDay, true)
+  assert.equal(event.url, 'https://linear.app/a8c/issue/DEVREL-1561')
+  assert.equal(event.status, 'confirmed')
+})
+
+test('Linear issue start/end are local midnight of the due date', () => {
+  const event = mapLinearIssue({
+    id: 'issue-1',
+    identifier: 'DEVREL-1561',
+    title: 'Test',
+    dueDate: '2026-08-07',
+    url: 'https://linear.app/a8c/issue/DEVREL-1561',
+    state: { name: 'Todo', type: 'unstarted' },
+    team: { id: 'team-devrel', key: 'DEVREL', name: 'DevRel' }
+  })
+
+  // Local midnight of Aug 7, 2026
+  const expected = new Date(2026, 7, 7).toISOString()
+  assert.equal(event.start, expected)
+  assert.equal(event.end, expected)
 })
