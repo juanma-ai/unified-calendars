@@ -74,6 +74,34 @@ export function mapTrelloCard(card, board, options = {}) {
 }
 
 /**
+ * A Linear issue due date is date-only, so these are all-day events.
+ * start/end are built as local midnight to match day bucketing in calendarViews.js.
+ */
+export function mapLinearIssue(issue) {
+  const [year, month, day] = issue.dueDate.split('-').map(Number)
+  const localStart = new Date(year, month - 1, day).toISOString()
+
+  return {
+    source: 'linear',
+    calendarId: `linear:${issue.team.id}`,
+    calendarName: issue.team.name,
+    calendarDefaultColor: '#5e6ad2',
+    calendarDefaultVisible: false,
+    id: `linear:${issue.id}`,
+    providerCalendarId: issue.team.id,
+    providerEventId: issue.id,
+    seriesId: null,
+    title: `${issue.identifier} ${issue.title}`,
+    start: localStart,
+    end: localStart,
+    allDay: true,
+    url: issue.url,
+    status: 'confirmed',
+    raw: issue
+  }
+}
+
+/**
  * A tracked session from the time tracker's SQLite file. Timestamps arrive as Unix
  * seconds; an entry with no `end` is still running, so it is closed at `now` and flagged
  * for the renderer to keep growing between refreshes.

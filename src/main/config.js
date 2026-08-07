@@ -24,5 +24,12 @@ export const config = {
       .split(',')
       .map((id) => id.trim())
       .filter(Boolean)
+  },
+  linear: {
+    apiKey: process.env.LINEAR_API_KEY,
+    teamKeys: (process.env.LINEAR_TEAM_KEYS ?? '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean)
   }
 }

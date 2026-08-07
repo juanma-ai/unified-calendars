@@ -1,4 +1,4 @@
-const SOURCE_ORDER = { google: 0, trello: 1, reminders: 2, timetracker: 3 }
+const SOURCE_ORDER = { google: 0, trello: 1, linear: 2, reminders: 3, timetracker: 4 }
 
 function normalizedPreferences(preferences = {}) {
   return {
