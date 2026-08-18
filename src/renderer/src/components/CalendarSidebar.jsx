@@ -20,7 +20,8 @@ const SOURCE_LABELS = {
   trello: 'Trello',
   linear: 'Linear',
   reminders: 'Reminders',
-  timetracker: 'Time Tracker'
+  timetracker: 'Time Tracker',
+  wallos: 'Wallos'
 }
 
 function compactAccountLabel(value) {

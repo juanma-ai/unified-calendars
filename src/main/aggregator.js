@@ -4,6 +4,7 @@ import { fetchTrelloEvents } from './sources/trello.js'
 import { fetchRemindersEvents } from './sources/reminders.js'
 import { fetchTimetrackerEvents } from './sources/timetracker.js'
 import { fetchLinearEvents } from './sources/linear.js'
+import { fetchWallosEvents } from './sources/wallos.js'
 import { createSourceRangeCache } from './sourceRangeCache.js'
 
 const store = new Store({ name: 'calendar-personal-app' })
@@ -12,6 +13,7 @@ const TTL_MS = {
   google: 5 * 60 * 1000,
   trello: 7 * 60 * 1000,
   linear: 7 * 60 * 1000,
+  wallos: 7 * 60 * 1000,
   reminders: 3 * 60 * 1000,
   // Short, because a running session's end is "now at fetch time" and stales quickly.
   timetracker: 30 * 1000
@@ -21,6 +23,7 @@ const FETCHERS = {
   google: fetchGoogleEvents,
   trello: fetchTrelloEvents,
   linear: fetchLinearEvents,
+  wallos: fetchWallosEvents,
   reminders: fetchRemindersEvents,
   timetracker: fetchTimetrackerEvents
 }

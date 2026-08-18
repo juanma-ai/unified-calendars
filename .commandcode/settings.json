@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(node --test test/calendar-views.test.mjs test/calendar-dates.test.mjs test/calendar-preferences.test.mjs test/calendar-event-mappers.test.mjs test/calendar-links.test.mjs test/calendar-view-model.test.mjs test/source-legend.test.mjs test/styles-css.test.mjs test/event-colors.test.mjs test/refresh-calendar.test.mjs 2 >& 1)",
+      "Shell(node --test test/calendar-preferences.test.mjs 2 >& 1)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

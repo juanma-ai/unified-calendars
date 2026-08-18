@@ -21,7 +21,8 @@ const SOURCE_NAMES = {
   trello: 'Trello',
   linear: 'Linear',
   reminders: 'Apple Reminders',
-  timetracker: 'Time Tracker'
+  timetracker: 'Time Tracker',
+  wallos: 'Wallos'
 }
 
 function ConnectionBadge({ ok, okLabel = 'Connected', okModifier = 'is-ok' }) {
@@ -144,6 +145,9 @@ function ConnectionCard({ source, statuses }) {
         )}
         {source === 'reminders' && (
           <p>Access is controlled by macOS in Privacy &amp; Security → Reminders.</p>
+        )}
+        {source === 'wallos' && (
+          <p>Recurring payment dates from your self-hosted subscription tracker.</p>
         )}
       </CardBody>
     </Card>
@@ -615,7 +619,7 @@ export function SettingsScreen({
                 onReconnect={onReconnectGoogle}
                 statuses={statuses}
               />
-              {['trello', 'linear', 'reminders'].map((source) => (
+              {['trello', 'linear', 'reminders', 'wallos'].map((source) => (
                 <ConnectionCard key={source} source={source} statuses={statuses} />
               ))}
               <TimeTrackerCard statuses={statuses} onSourceDataChanged={onSourceDataChanged} />

@@ -31,5 +31,9 @@ export const config = {
       .split(',')
       .map((k) => k.trim())
       .filter(Boolean)
+  },
+  wallos: {
+    baseUrl: process.env.WALLOS_BASE_URL,
+    apiKey: process.env.WALLOS_API_KEY
   }
 }
