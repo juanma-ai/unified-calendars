@@ -3,7 +3,8 @@ export const SOURCES = [
   { key: 'trello', label: 'Trello', color: '#0079bf' },
   { key: 'linear', label: 'Linear', color: '#5e6ad2' },
   { key: 'reminders', label: 'Reminders', color: '#ff9500' },
-  { key: 'timetracker', label: 'Time Tracker', color: '#00875a' }
+  { key: 'timetracker', label: 'Time Tracker', color: '#00875a' },
+  { key: 'wallos', label: 'Wallos', color: '#1d4ed8' }
 ]
 
 export const SOURCE_COLORS = Object.fromEntries(SOURCES.map((s) => [s.key, s.color]))

@@ -23,5 +23,9 @@ export function getCalendarLink(calendar) {
     return { label: 'Open in Linear', url: calendar.url }
   }
 
+  if (calendar?.source === 'wallos' && calendar.url) {
+    return { label: 'Open in Wallos', url: calendar.url }
+  }
+
   return null
 }

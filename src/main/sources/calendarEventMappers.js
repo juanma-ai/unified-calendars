@@ -102,6 +102,37 @@ export function mapLinearIssue(issue) {
 }
 
 /**
+ * A Wallos subscription payment. Each occurrence is an all-day event on the
+ * payment date. Subscriptions recur based on cycle (1=days, 2=weeks, 3=months,
+ * 4=years) and frequency (every N cycles). Each payment method becomes its own calendar.
+ */
+export function mapWallosPayment(subscription, paymentDate) {
+  const [y, m, d] = paymentDate.split('-').map(Number)
+  const iso = new Date(y, m - 1, d).toISOString()
+  const price = Number(subscription.price).toFixed(2)
+  const calendarId = `wallos:${subscription.payment_method_id}`
+
+  return {
+    source: 'wallos',
+    calendarId,
+    calendarName: subscription.payment_method_name ?? 'Unknown',
+    calendarDefaultColor: '#1d4ed8',
+    calendarDefaultVisible: true,
+    id: `wallos:${subscription.id}:${paymentDate}`,
+    providerCalendarId: String(subscription.payment_method_id),
+    providerEventId: `${subscription.id}:${paymentDate}`,
+    seriesId: `wallos:${subscription.id}:series`,
+    title: `${subscription.name} ${price}`,
+    start: iso,
+    end: iso,
+    allDay: true,
+    url: subscription.url || null,
+    status: 'confirmed',
+    raw: subscription
+  }
+}
+
+/**
  * A tracked session from the time tracker's SQLite file. Timestamps arrive as Unix
  * seconds; an entry with no `end` is still running, so it is closed at `now` and flagged
  * for the renderer to keep growing between refreshes.
