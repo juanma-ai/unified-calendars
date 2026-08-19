@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('calendarAPI', {
     ipcRenderer.invoke('preferences:setCalendarSidebarVisibility', calendarId, visible),
   setCalendarVisibility: (calendarId, visible) =>
     ipcRenderer.invoke('preferences:setCalendarVisibility', calendarId, visible),
+  toggleFocusedCalendar: (calendarId) =>
+    ipcRenderer.invoke('preferences:toggleFocusedCalendar', calendarId),
   setSourceEnabled: (source, enabled) =>
     ipcRenderer.invoke('preferences:setSourceEnabled', source, enabled),
   hideEvent: (hiddenEvent) => ipcRenderer.invoke('preferences:hideEvent', hiddenEvent),

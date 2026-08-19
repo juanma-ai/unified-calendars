@@ -183,6 +183,10 @@ export function App() {
     window.calendarAPI.setCalendarVisibility(calendarId, visible).then(setPreferences)
   }, [])
 
+  const handleFocusedToggle = useCallback((calendarId) => {
+    window.calendarAPI.toggleFocusedCalendar(calendarId).then(setPreferences)
+  }, [])
+
   const handleHideEvent = useCallback((event, scope) => {
     window.calendarAPI
       .hideEvent({
@@ -367,6 +371,7 @@ export function App() {
           hiddenEventCount={preferences.hiddenEvents.length}
           now={now}
           onColorChange={handleCalendarColor}
+          onFocusedToggle={handleFocusedToggle}
           onOpenSettings={openSettings}
           onSourceEnabledChange={handleSourceEnabled}
           onVisibilityChange={handleCalendarVisibility}

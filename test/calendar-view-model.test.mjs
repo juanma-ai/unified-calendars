@@ -41,7 +41,8 @@ test('builds calendars with persisted color and visibility', () => {
     color: '#3858e9',
     count: 1,
     sidebarVisible: true,
-    visible: true
+    visible: true,
+    focused: false
   })
   assert.equal(calendars[1].visible, false)
 
