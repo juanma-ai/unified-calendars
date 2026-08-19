@@ -1,3 +1,4 @@
+import { tz } from '@date-fns/tz'
 import {
   addDays,
   addMonths,
@@ -16,6 +17,7 @@ import {
   startOfYear
 } from 'date-fns'
 import { formatWeekRange, WEEK_OPTIONS } from './calendarDates.js'
+import { resolveTimeZone } from './calendarTimeZones.js'
 import { totalsByProject } from './trackedTime.js'
 
 export const VIEWS = ['day', 'week', 'month', 'year', 'agenda']
@@ -38,62 +40,81 @@ export function isCalendarView(value) {
 // the anchor on today that puts today first, which is the whole point of it.
 export const AGENDA_DAYS = 30
 
-function agendaRange(anchor) {
+function withTimeZone(timeZone) {
+  return { in: tz(resolveTimeZone(timeZone)) }
+}
+
+function agendaRange(anchor, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
   return {
-    start: startOfDay(anchor),
-    end: endOfDay(addDays(anchor, AGENDA_DAYS - 1))
+    start: startOfDay(anchor, zoneContext),
+    end: endOfDay(addDays(anchor, AGENDA_DAYS - 1, zoneContext), zoneContext)
   }
 }
 
 // The month grid works off whole calendar weeks so it has no ragged first and
 // last rows.
-function monthGridRange(anchor) {
+function monthGridRange(anchor, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
   return {
-    start: startOfWeek(startOfMonth(anchor), WEEK_OPTIONS),
-    end: endOfWeek(endOfMonth(anchor), WEEK_OPTIONS)
+    start: startOfWeek(startOfMonth(anchor, zoneContext), { ...WEEK_OPTIONS, ...zoneContext }),
+    end: endOfWeek(endOfMonth(anchor, zoneContext), { ...WEEK_OPTIONS, ...zoneContext })
   }
 }
 
-function formatDayRange({ start, end }) {
-  return `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
+function formatDayRange({ start, end }, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
+  return `${format(start, 'MMM d', zoneContext)} – ${format(end, 'MMM d, yyyy', zoneContext)}`
 }
 
-export function getViewRange(view, anchor) {
+export function getViewRange(view, anchor, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
+
   switch (view) {
     case 'day':
-      return { start: startOfDay(anchor), end: endOfDay(anchor) }
+      return { start: startOfDay(anchor, zoneContext), end: endOfDay(anchor, zoneContext) }
     case 'agenda':
-      return agendaRange(anchor)
+      return agendaRange(anchor, timeZone)
     case 'month':
-      return monthGridRange(anchor)
+      return monthGridRange(anchor, timeZone)
     case 'year':
-      return { start: startOfYear(anchor), end: endOfYear(anchor) }
+      return {
+        start: startOfYear(anchor, zoneContext),
+        end: endOfYear(anchor, zoneContext)
+      }
     case 'week':
     default:
-      return { start: startOfWeek(anchor, WEEK_OPTIONS), end: endOfWeek(anchor, WEEK_OPTIONS) }
+      return {
+        start: startOfWeek(anchor, { ...WEEK_OPTIONS, ...zoneContext }),
+        end: endOfWeek(anchor, { ...WEEK_OPTIONS, ...zoneContext })
+      }
   }
 }
 
-export function getViewDays(view, anchor) {
-  if (view === 'day') return [startOfDay(anchor)]
+export function getViewDays(view, anchor, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
 
-  const { start, end } = getViewRange(view, anchor)
-  return eachDayOfInterval({ start, end })
+  if (view === 'day') return [startOfDay(anchor, zoneContext)]
+
+  const { start, end } = getViewRange(view, anchor, timeZone)
+  return eachDayOfInterval({ start, end }, zoneContext)
 }
 
-export function formatViewLabel(view, anchor) {
+export function formatViewLabel(view, anchor, timeZone) {
+  const zoneContext = withTimeZone(timeZone)
+
   switch (view) {
     case 'day':
-      return format(anchor, 'EEE, MMM d, yyyy')
+      return format(anchor, 'EEE, MMM d, yyyy', zoneContext)
     case 'agenda':
-      return formatDayRange(agendaRange(anchor))
+      return formatDayRange(agendaRange(anchor, timeZone), timeZone)
     case 'month':
-      return format(anchor, 'MMMM yyyy')
+      return format(anchor, 'MMMM yyyy', zoneContext)
     case 'year':
-      return format(anchor, 'yyyy')
+      return format(anchor, 'yyyy', zoneContext)
     case 'week':
     default:
-      return formatWeekRange(startOfWeek(anchor, WEEK_OPTIONS))
+      return formatWeekRange(startOfWeek(anchor, { ...WEEK_OPTIONS, ...zoneContext }), timeZone)
   }
 }
 

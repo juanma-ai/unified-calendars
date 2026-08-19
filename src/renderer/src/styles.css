@@ -149,6 +149,50 @@ input {
   margin: 0 8px 0 0;
 }
 
+.app-header__timezone-control {
+  flex: 0 0 auto;
+}
+
+.app-header__timezone-popover {
+  width: 280px;
+  padding: 16px;
+}
+
+.app-header__timezone-results,
+.app-header__timezone-secondary-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-header__timezone-results li,
+.app-header__timezone-secondary-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.app-header__timezone-results .components-button,
+.app-header__timezone-secondary-list .components-button {
+  height: auto;
+  padding: 0;
+  font-size: 13px;
+}
+
+.app-header__timezone-secondary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.app-header__timezone-secondary-list {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* Sidebar */
 
 .calendar-sidebar {
@@ -387,11 +431,12 @@ input {
 .calendar-week {
   /* Day and week are the same time grid; only the column count differs. */
   --calendar-day-count: 7;
+  --calendar-ruler-width: 92px;
 
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   width: 100%;
-  min-width: calc(92px + var(--calendar-day-count) * 104px);
+  min-width: calc(var(--calendar-ruler-width) + var(--calendar-day-count) * 104px);
   height: 100%;
   min-height: 0;
 }
@@ -400,7 +445,7 @@ input {
 .calendar-week__all-day,
 .calendar-week__time-grid {
   display: grid;
-  grid-template-columns: 92px repeat(var(--calendar-day-count), minmax(104px, 1fr));
+  grid-template-columns: var(--calendar-ruler-width) repeat(var(--calendar-day-count), minmax(104px, 1fr));
 }
 
 .calendar-week__corner {
@@ -504,6 +549,10 @@ input {
   border-right: 1px solid var(--border);
 }
 
+.calendar-week__time-labels-primary {
+  position: relative;
+}
+
 .calendar-week__time-labels span {
   position: absolute;
   right: 12px;
@@ -511,6 +560,46 @@ input {
   font-size: 11px;
   line-height: 1;
   transform: translateY(-50%);
+}
+
+.calendar-week__time-label {
+  cursor: default;
+}
+
+.calendar-week__timezone-popover {
+  min-width: 220px;
+  padding: 12px;
+}
+
+.calendar-week__timezone-popover__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.calendar-week__timezone-popover__row:last-child {
+  border-bottom: 0;
+}
+
+.calendar-week__timezone-popover__time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.calendar-week__timezone-popover__zone {
+  flex: 1 1 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calendar-week__timezone-popover__note {
+  width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .calendar-week__time-day {
@@ -1181,6 +1270,55 @@ input {
   font-size: 14px;
 }
 
+.settings-time-zones {
+  max-width: 720px;
+}
+
+.settings-time-zones__intro {
+  margin: 0 0 20px;
+  color: #50575e;
+  font-size: 14px;
+}
+
+.settings-time-zones__section {
+  margin-bottom: 28px;
+}
+
+.settings-time-zones__section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-time-zones__current {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-time-zones__results,
+.settings-time-zones__list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-time-zones__results li,
+.settings-time-zones__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.settings-time-zones__results .components-button,
+.settings-time-zones__list .components-button {
+  height: auto;
+  padding: 0;
+  font-size: 13px;
+}
+
 .settings-hidden-event {
   min-height: 68px;
   padding: 12px 0;
@@ -1258,7 +1396,7 @@ input {
   position: absolute;
   z-index: 2;
   right: 0;
-  left: 92px;
+  left: var(--calendar-ruler-width);
   height: 2px;
   background: #e5484d;
   pointer-events: none;
@@ -2038,4 +2176,96 @@ input {
   pointer-events: auto;
   max-width: 480px;
   box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+/* TimeZonePicker component */
+
+.timezone-picker {
+  position: relative;
+}
+
+.timezone-picker__results {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.timezone-picker__results li {
+  min-height: 28px;
+}
+
+.timezone-picker__results .components-button {
+  width: 100%;
+  height: auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.timezone-picker__note {
+  margin-top: 8px;
+}
+
+/* Settings time zone entry row */
+
+.settings-time-zones__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-time-zones__entry .components-base-control {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.settings-time-zones__entry .components-base-control__field {
+  margin: 0;
+}
+
+.settings-time-zones__entry .components-text-input__input {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+/* Secondary zone ruler marks on the time grid */
+
+.calendar-week__time-labels-secondary {
+  position: relative;
+  border-top: 1px solid #f0f0f0;
+}
+
+.calendar-week__time-labels-secondary span {
+  position: absolute;
+  right: 4px;
+  color: #b0b0b0;
+  font-size: 9px;
+  line-height: 1;
+  transform: translateY(-50%);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-week__secondary-ruler {
+  position: absolute;
+  z-index: 0;
+  left: var(--calendar-ruler-width);
+  right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    #e8e8e8 0,
+    #e8e8e8 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  pointer-events: none;
 }

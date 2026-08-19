@@ -1,4 +1,6 @@
+import { tz } from '@date-fns/tz'
 import { addDays, addMinutes, differenceInMinutes, isSameDay, startOfDay } from 'date-fns'
+import { resolveTimeZone } from './calendarTimeZones.js'
 import { effectiveEnd } from './trackedTime.js'
 
 export const HOUR_HEIGHT = 64
@@ -41,7 +43,14 @@ function shiftAllDayValue(value, deltaDays, dateOnly) {
  * vertically. Duration is preserved; the resulting start snaps to the grid and
  * stays inside its day.
  */
-export function getMoveResult({ start, end, allDay = false, deltaDays = 0, deltaMinutes = 0 }) {
+export function getMoveResult({
+  start,
+  end,
+  allDay = false,
+  deltaDays = 0,
+  deltaMinutes = 0,
+  timeZone
+}) {
   const startDate = new Date(start)
   const endDate = new Date(end ?? start)
   const durationMs = Math.max(0, endDate.getTime() - startDate.getTime())
@@ -54,8 +63,9 @@ export function getMoveResult({ start, end, allDay = false, deltaDays = 0, delta
     }
   }
 
+  const zoneContext = { in: tz(resolveTimeZone(timeZone)) }
   const shifted = addMinutes(addDays(startDate, deltaDays), deltaMinutes)
-  const dayStart = startOfDay(shifted)
+  const dayStart = startOfDay(shifted, zoneContext)
   const minutesOfDay = clamp(
     snapToInterval(differenceInMinutes(shifted, dayStart)),
     0,
@@ -74,10 +84,11 @@ export function getMoveResult({ start, end, allDay = false, deltaDays = 0, delta
  * (`edge: 'end'`) was dragged by `deltaMinutes`. The moved edge snaps to the
  * grid and the event never gets shorter than MINIMUM_EVENT_MINUTES.
  */
-export function getResizeResult({ start, end, edge, deltaMinutes }) {
+export function getResizeResult({ start, end, edge, deltaMinutes, timeZone }) {
+  const zoneContext = { in: tz(resolveTimeZone(timeZone)) }
   const startDate = new Date(start)
   const endDate = new Date(end ?? start)
-  const dayStart = startOfDay(startDate)
+  const dayStart = startOfDay(startDate, zoneContext)
 
   if (edge === 'start') {
     const shifted = addMinutes(startDate, deltaMinutes)
@@ -103,9 +114,10 @@ export function getCenteredTimeScrollTop(date, viewportHeight) {
   return Math.min(Math.max(0, currentTop - viewportHeight / 2), maxScrollTop)
 }
 
-function timedPosition(event, day) {
-  const dayStart = startOfDay(day)
-  const dayEnd = addDays(dayStart, 1)
+function timedPosition(event, day, timeZone) {
+  const zoneContext = { in: tz(resolveTimeZone(timeZone)) }
+  const dayStart = startOfDay(day, zoneContext)
+  const dayEnd = addDays(dayStart, 1, zoneContext)
   const eventStart = new Date(event.start)
   const rawEnd = new Date(event.end ?? event.start)
   const eventEnd = rawEnd > eventStart
@@ -138,9 +150,10 @@ export function isTrackedEvent(event) {
  * this day; a session too short to see is grown to `MINIMUM_TRACKED_MINUTES`, upward when
  * that would otherwise push it past midnight.
  */
-function trackedPosition(event, day, now) {
-  const dayStart = startOfDay(day)
-  const dayEnd = addDays(dayStart, 1)
+function trackedPosition(event, day, now, timeZone) {
+  const zoneContext = { in: tz(resolveTimeZone(timeZone)) }
+  const dayStart = startOfDay(day, zoneContext)
+  const dayEnd = addDays(dayStart, 1, zoneContext)
   const eventStart = new Date(event.start)
   const eventEnd = new Date(effectiveEnd(event, now))
   const clampedStart = eventStart < dayStart ? dayStart : eventStart
@@ -163,9 +176,10 @@ function trackedPosition(event, day, now) {
   }
 }
 
-function overlapsDay(event, day, now) {
-  const dayStart = startOfDay(day)
-  const dayEnd = addDays(dayStart, 1)
+function overlapsDay(event, day, now, timeZone) {
+  const zoneContext = { in: tz(resolveTimeZone(timeZone)) }
+  const dayStart = startOfDay(day, zoneContext)
+  const dayEnd = addDays(dayStart, 1, zoneContext)
   return new Date(event.start) < dayEnd && new Date(effectiveEnd(event, now)) > dayStart
 }
 
@@ -218,18 +232,22 @@ function assignOverlapColumns(events) {
  * day it starts on, but a tracked session belongs to every day it touches, or an
  * overnight session would vanish from today's column at midnight.
  */
-export function buildDayLayout(events, day, { now = Date.now() } = {}) {
+export function buildDayLayout(events, day, { now = Date.now(), timeZone } = {}) {
   const scheduled = events.filter(
     (event) => !isTrackedEvent(event) && isSameDay(new Date(event.start), day)
   )
   const allDayEvents = scheduled.filter((event) => event.allDay)
   const timedEvents = assignOverlapColumns(
-    scheduled.filter((event) => !event.allDay).map((event) => timedPosition(event, day))
+    scheduled
+      .filter((event) => !event.allDay)
+      .map((event) => timedPosition(event, day, timeZone))
   )
   const trackedEvents = assignOverlapColumns(
     events
-      .filter((event) => isTrackedEvent(event) && !event.allDay && overlapsDay(event, day, now))
-      .map((event) => trackedPosition(event, day, now))
+      .filter(
+        (event) => isTrackedEvent(event) && !event.allDay && overlapsDay(event, day, now, timeZone)
+      )
+      .map((event) => trackedPosition(event, day, now, timeZone))
   )
 
   return { allDayEvents, timedEvents, trackedEvents }

@@ -334,3 +334,29 @@ test('year heat stays a scheduled-load reading, with tracked work as project dot
   assert.equal(heatmap.months[0].trackedDays, 1)
   assert.equal(heatmap.months[5].trackedDays, 0)
 })
+
+const timezoneAnchor = new Date('2026-07-30T12:00:00-07:00')
+
+function localHours(date) {
+  return date.getHours()
+}
+
+test('day range respects the provided time zone', () => {
+  const { start, end } = getViewRange('day', timezoneAnchor, 'America/Los_Angeles')
+
+  assert.equal(localHours(start), 0)
+  assert.equal(localHours(end), 23)
+  assert.equal(new Date(start.getTime()).toISOString(), '2026-07-30T07:00:00.000Z')
+})
+
+test('week range respects the provided time zone and starts on Monday', () => {
+  const { start, end } = getViewRange('week', timezoneAnchor, 'America/Los_Angeles')
+
+  assert.equal(start.getDay(), 1)
+  assert.equal(localHours(start), 0)
+  assert.equal(localHours(end), 23)
+})
+
+test('formatViewLabel uses the provided time zone', () => {
+  assert.equal(formatViewLabel('day', timezoneAnchor, 'America/Los_Angeles'), 'Thu, Jul 30, 2026')
+})

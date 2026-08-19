@@ -15,6 +15,8 @@ import {
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { getIpcErrorMessage } from '../ipcErrors.js'
+import { formatTimeZoneAbbreviation } from '../calendarTimeZones.js'
+import { searchCities } from '../cityTimeZones.js'
 
 const SOURCE_NAMES = {
   google: 'Google Calendar',
@@ -532,6 +534,127 @@ function CalendarsTab({ calendars, onVisibilityChange }) {
   )
 }
 
+function TimeZonesTab({
+  secondaryTimeZones,
+  timeZone,
+  timeZoneCity,
+  onSecondaryTimeZoneNoteChange,
+  onSecondaryTimeZonesChange,
+  onTimeZoneChange
+}) {
+  const [primaryQuery, setPrimaryQuery] = useState('')
+  const [secondaryQuery, setSecondaryQuery] = useState('')
+  const [secondaryNote, setSecondaryNote] = useState('')
+
+  const primaryResults = searchCities(primaryQuery)
+  const secondaryResults = searchCities(secondaryQuery)
+
+  function addSecondaryZone(zone, city) {
+    if (!zone || secondaryTimeZones.some((item) => item.zone === zone)) return
+    onSecondaryTimeZonesChange([...secondaryTimeZones, { zone, city, note: secondaryNote }])
+    setSecondaryQuery('')
+    setSecondaryNote('')
+  }
+
+  function removeSecondaryZone(zone) {
+    onSecondaryTimeZonesChange(secondaryTimeZones.filter((item) => item.zone !== zone))
+  }
+
+  function handleNoteChange(zone, note) {
+    onSecondaryTimeZoneNoteChange?.(zone, note)
+  }
+
+  return (
+    <div className="settings-time-zones">
+      <p className="settings-time-zones__intro">
+        The primary zone is what the day and week grids are laid out against.
+        Secondary zones are shown as read-only rulers next to the hour labels.
+      </p>
+
+      <div className="settings-time-zones__section">
+        <h3>Primary time zone</h3>
+        <TextControl
+          __nextHasNoMarginBottom
+          label="Search city"
+          value={primaryQuery}
+          onChange={setPrimaryQuery}
+        />
+        {primaryQuery && primaryResults.length > 0 && (
+          <ul className="settings-time-zones__results">
+            {primaryResults.slice(0, 8).map((result) => (
+              <li key={result.zone}>
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    onTimeZoneChange(result.zone)
+                    setPrimaryQuery('')
+                  }}
+                >
+                  {result.city} ({result.zone})
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="settings-time-zones__current">
+          Current: {formatTimeZoneAbbreviation(timeZone, new Date())} ({timeZoneCity ?? timeZone})
+        </p>
+      </div>
+
+      <div className="settings-time-zones__section">
+        <h3>Secondary time zones</h3>
+          <TextControl
+          __nextHasNoMarginBottom
+          label="Search city to add"
+          value={secondaryQuery}
+          onChange={setSecondaryQuery}
+        />
+        <TextControl
+          __nextHasNoMarginBottom
+          label="Note (optional)"
+          value={secondaryNote}
+          onChange={setSecondaryNote}
+        />
+        {secondaryQuery && secondaryResults.length > 0 && (
+          <ul className="settings-time-zones__results">
+            {secondaryResults.slice(0, 8).map((result) => (
+              <li key={result.zone}>
+                <Button variant="link" onClick={() => addSecondaryZone(result.zone, result.city)}>
+                  {result.city} ({result.zone})
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {secondaryTimeZones.length > 0 && (
+          <ul className="settings-time-zones__list">
+            {secondaryTimeZones.map((entry) => (
+              <li key={entry.zone}>
+                <div className="settings-time-zones__entry">
+                  <span>
+                    {formatTimeZoneAbbreviation(entry.zone, new Date())} ({entry.city ?? entry.zone})
+                  </span>
+                  <TextControl
+                    __nextHasNoMarginBottom
+                    label="Note"
+                    hideLabelFromVision
+                    placeholder="Note"
+                    value={entry.note ?? ''}
+                    onChange={(note) => handleNoteChange(entry.zone, note)}
+                  />
+                  <Button variant="link" isDestructive onClick={() => removeSecondaryZone(entry.zone)}>
+                    Remove
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function HiddenEventsTab({ hiddenEvents, onRestore }) {
   if (hiddenEvents.length === 0) {
     return (
@@ -578,9 +701,15 @@ export function SettingsScreen({
   onDisconnectGoogle,
   onReconnectGoogle,
   onRestoreHiddenEvent,
+  onSecondaryTimeZoneNoteChange,
+  onSecondaryTimeZonesChange,
   onSourceDataChanged,
+  onTimeZoneChange,
   onVisibilityChange,
-  statuses
+  secondaryTimeZones,
+  statuses,
+  timeZone,
+  timeZoneCity
 }) {
   return (
     <main className="settings-screen">
@@ -598,7 +727,8 @@ export function SettingsScreen({
         tabs={[
           { name: 'connections', title: 'Connections' },
           { name: 'calendars', title: 'Calendars' },
-          { name: 'hidden-events', title: 'Hidden events' }
+          { name: 'hidden-events', title: 'Hidden events' },
+          { name: 'time-zones', title: 'Time zones' }
         ]}
       >
         {(tab) => {
@@ -608,6 +738,19 @@ export function SettingsScreen({
 
           if (tab.name === 'hidden-events') {
             return <HiddenEventsTab hiddenEvents={hiddenEvents} onRestore={onRestoreHiddenEvent} />
+          }
+
+          if (tab.name === 'time-zones') {
+            return (
+              <TimeZonesTab
+                onSecondaryTimeZoneNoteChange={onSecondaryTimeZoneNoteChange}
+                onSecondaryTimeZonesChange={onSecondaryTimeZonesChange}
+                onTimeZoneChange={onTimeZoneChange}
+                secondaryTimeZones={secondaryTimeZones}
+                timeZone={timeZone}
+                timeZoneCity={timeZoneCity}
+              />
+            )
           }
 
           return (

@@ -26,16 +26,17 @@ export function MonthView({
   onHideEvent,
   onOpenDay,
   preferences,
-  sessionActions
+  sessionActions,
+  timeZone
 }) {
-  const days = getViewDays('month', anchorDate)
+  const days = getViewDays('month', anchorDate, timeZone)
   const cells = buildMonthCells(events, days, MAX_EVENTS_PER_DAY)
   const trackedTotals = buildTrackedDayTotals(events, days)
   const showTracked = isSourceEnabled(preferences, 'timetracker')
   const weekdays = days.slice(0, 7)
 
   return (
-    <section className="calendar-month" aria-label={formatViewLabel('month', anchorDate)}>
+    <section className="calendar-month" aria-label={formatViewLabel('month', anchorDate, timeZone)}>
       <div className="calendar-month__weekdays">
         {weekdays.map((day) => (
           <div className="calendar-month__weekday" key={day.toISOString()}>

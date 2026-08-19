@@ -102,3 +102,26 @@ test('the time tracker data folder round-trips and can be cleared', () => {
   preferences.setTimetrackerDataDir('')
   assert.equal(preferences.get().timetrackerDataDir, null)
 })
+
+test('time zone preferences round-trip and default to the system zone', () => {
+  const preferences = createCalendarPreferencesStore(memoryStore())
+
+  preferences.setTimeZone('Europe/Lisbon')
+  assert.equal(preferences.get().timeZone, 'Europe/Lisbon')
+
+  preferences.setSecondaryTimeZones(['America/New_York', 'Asia/Tokyo'])
+  assert.deepEqual(preferences.get().secondaryTimeZones, [
+    { zone: 'America/New_York', city: null, note: '' },
+    { zone: 'Asia/Tokyo', city: null, note: '' }
+  ])
+})
+
+test('empty or invalid time zone values fall back to the system zone', () => {
+  const preferences = createCalendarPreferencesStore(memoryStore())
+
+  preferences.setTimeZone('')
+  assert.ok(preferences.get().timeZone.length > 0)
+
+  preferences.setSecondaryTimeZones(null)
+  assert.deepEqual(preferences.get().secondaryTimeZones, [])
+})

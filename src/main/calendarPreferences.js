@@ -1,6 +1,7 @@
 import Store from 'electron-store'
 
 const PREFERENCES_KEY = 'calendarPreferences'
+const DEFAULT_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
 const DEFAULT_PREFERENCES = {
   calendarColors: {},
   calendarSidebarVisibility: {},
@@ -9,7 +10,26 @@ const DEFAULT_PREFERENCES = {
   hiddenCalendars: [],
   hiddenEvents: [],
   sourceEnabled: {},
-  timetrackerDataDir: null
+  timetrackerDataDir: null,
+  timeZone: DEFAULT_TIME_ZONE,
+  timeZoneCity: null,
+  secondaryTimeZones: []
+}
+
+function normalizeSecondaryTimeZones(zones) {
+  if (!Array.isArray(zones)) return []
+  return zones
+    .map((zone) => {
+      if (typeof zone === 'string') {
+        return { zone, city: null, note: '' }
+      }
+      return {
+        zone: zone?.zone,
+        city: zone?.city ?? null,
+        note: zone?.note ?? ''
+      }
+    })
+    .filter((entry) => entry.zone)
 }
 
 function normalize(value = {}) {
@@ -25,7 +45,10 @@ function normalize(value = {}) {
     sourceEnabled: value.sourceEnabled ?? {},
     // Where the calendar *reads* the tracker's database from. The tracker keeps writing to
     // its own directory; null means fall back to TIMETRACKER_DIR then ~/.timetracker.
-    timetrackerDataDir: value.timetrackerDataDir ?? null
+    timetrackerDataDir: value.timetrackerDataDir ?? null,
+    timeZone: value.timeZone ?? DEFAULT_TIME_ZONE,
+    timeZoneCity: value.timeZoneCity ?? null,
+    secondaryTimeZones: normalizeSecondaryTimeZones(value.secondaryTimeZones)
   }
 }
 
@@ -119,6 +142,40 @@ export function createCalendarPreferencesStore(storage) {
       return get()
     },
 
+    setTimeZone(timeZone, city) {
+      const preferences = get()
+      preferences.timeZone = timeZone || DEFAULT_TIME_ZONE
+      if (city !== undefined) {
+        preferences.timeZoneCity = city || null
+      }
+      save(preferences)
+      return get()
+    },
+
+    setTimeZoneCity(city) {
+      const preferences = get()
+      preferences.timeZoneCity = city || null
+      save(preferences)
+      return get()
+    },
+
+    setSecondaryTimeZones(zones) {
+      const preferences = get()
+      preferences.secondaryTimeZones = normalizeSecondaryTimeZones(zones)
+      save(preferences)
+      return get()
+    },
+
+    setSecondaryTimeZoneNote(zone, note) {
+      const preferences = get()
+      const entry = preferences.secondaryTimeZones.find((item) => item.zone === zone)
+      if (entry) {
+        entry.note = note || ''
+        save(preferences)
+      }
+      return get()
+    },
+
     hideEvent(event) {
       const targetId = event.scope === 'series' ? event.seriesId : event.eventId
       if (!targetId) throw new Error(`Cannot hide ${event.scope} without an identifier`)
@@ -171,5 +228,10 @@ export const setSourceEnabled = (source, enabled) =>
   getDefaultStore().setSourceEnabled(source, enabled)
 export const setTimetrackerDataDir = (dataDir) =>
   getDefaultStore().setTimetrackerDataDir(dataDir)
+export const setTimeZone = (timeZone, city) => getDefaultStore().setTimeZone(timeZone, city)
+export const setTimeZoneCity = (city) => getDefaultStore().setTimeZoneCity(city)
+export const setSecondaryTimeZones = (zones) => getDefaultStore().setSecondaryTimeZones(zones)
+export const setSecondaryTimeZoneNote = (zone, note) =>
+  getDefaultStore().setSecondaryTimeZoneNote(zone, note)
 export const hideCalendarEvent = (event) => getDefaultStore().hideEvent(event)
 export const restoreHiddenCalendarEvent = (key) => getDefaultStore().restoreHiddenEvent(key)

@@ -14,6 +14,7 @@ import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendar
 import { useLiveClock } from './liveClock.js'
 import { DEFAULT_TRACKER_DB_PATH, shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
+import { getSystemTimeZone } from './calendarTimeZones.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
 const VIEW_STORAGE_KEY = 'calendarView'
@@ -22,7 +23,10 @@ const DEFAULT_PREFERENCES = {
   calendarSidebarVisibility: {},
   calendarVisibility: {},
   hiddenCalendars: [],
-  hiddenEvents: []
+  hiddenEvents: [],
+  timeZone: getSystemTimeZone(),
+  timeZoneCity: null,
+  secondaryTimeZones: []
 }
 function readStoredView() {
   const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
@@ -70,9 +74,9 @@ export function App() {
   // One source of truth for the fetch range, so navigation and Refresh now can
   // never ask the main process for different windows of time.
   const range = useMemo(() => {
-    const { start, end } = getViewRange(calendarView, anchorDate)
+    const { start, end } = getViewRange(calendarView, anchorDate, preferences.timeZone)
     return { start: start.toISOString(), end: end.toISOString() }
-  }, [anchorDate, calendarView])
+  }, [anchorDate, calendarView, preferences.timeZone])
 
   const calendars = useMemo(
     () => buildCalendars(events, preferences, availableCalendars),
@@ -177,6 +181,18 @@ export function App() {
 
   const handleSourceEnabled = useCallback((source, enabled) => {
     window.calendarAPI.setSourceEnabled(source, enabled).then(setPreferences)
+  }, [])
+
+  const handleTimeZoneChange = useCallback((timeZone, city) => {
+    window.calendarAPI.setTimeZone(timeZone, city).then(setPreferences)
+  }, [])
+
+  const handleSecondaryTimeZonesChange = useCallback((zones) => {
+    window.calendarAPI.setSecondaryTimeZones(zones).then(setPreferences)
+  }, [])
+
+  const handleSecondaryTimeZoneNoteChange = useCallback((zone, note) => {
+    window.calendarAPI.setSecondaryTimeZoneNote(zone, note).then(setPreferences)
   }, [])
 
   const handleCalendarVisibility = useCallback((calendarId, visible) => {
@@ -343,9 +359,15 @@ export function App() {
           onDisconnectGoogle={handleDisconnectGoogle}
           onReconnectGoogle={handleReconnectGoogle}
           onRestoreHiddenEvent={handleRestoreHiddenEvent}
+          onSecondaryTimeZoneNoteChange={handleSecondaryTimeZoneNoteChange}
+          onSecondaryTimeZonesChange={handleSecondaryTimeZonesChange}
           onSourceDataChanged={refresh}
+          onTimeZoneChange={handleTimeZoneChange}
           onVisibilityChange={handleCalendarSidebarVisibility}
+          secondaryTimeZones={preferences.secondaryTimeZones}
           statuses={statuses}
+          timeZone={preferences.timeZone}
+          timeZoneCity={preferences.timeZoneCity}
         />
       </div>
     )
@@ -359,8 +381,13 @@ export function App() {
         onNavigate={setAnchorDate}
         onOpenSettings={openSettings}
         onRefresh={handleRefreshNow}
+        onSecondaryTimeZonesChange={handleSecondaryTimeZonesChange}
+        onTimeZoneChange={handleTimeZoneChange}
         onViewChange={handleViewChange}
         refreshing={refreshing}
+        secondaryTimeZones={preferences.secondaryTimeZones}
+        timeZone={preferences.timeZone}
+        timeZoneCity={preferences.timeZoneCity}
       />
       <div className="app">
         <CalendarSidebar
@@ -396,6 +423,7 @@ export function App() {
               onOpenDay={openDay}
               preferences={preferences}
               sessionActions={sessionActions}
+              timeZone={preferences.timeZone}
             />
           )}
           {calendarView === 'agenda' && (
@@ -406,6 +434,7 @@ export function App() {
               onHideEvent={handleHideEvent}
               preferences={preferences}
               sessionActions={sessionActions}
+              timeZone={preferences.timeZone}
             />
           )}
           {calendarView === 'year' && (
@@ -414,6 +443,7 @@ export function App() {
               events={visibleEvents}
               onOpenDay={openDay}
               preferences={preferences}
+              timeZone={preferences.timeZone}
             />
           )}
           {/* Only the day/week time grid draws tracked lane bars, so only it needs the key. */}
@@ -432,7 +462,10 @@ export function App() {
               onEventTimeChange={handleEventTimeChange}
               onHideEvent={handleHideEvent}
               preferences={preferences}
+              secondaryTimeZones={preferences.secondaryTimeZones}
               sessionActions={sessionActions}
+              timeZone={preferences.timeZone}
+              timeZoneCity={preferences.timeZoneCity}
             />
           )}
         </main>

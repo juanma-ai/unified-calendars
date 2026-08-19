@@ -1,3 +1,5 @@
+import { Popover } from '@wordpress/components'
+import { TZDate, tz } from '@date-fns/tz'
 import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
@@ -11,6 +13,12 @@ import {
   HOUR_HEIGHT,
   SNAP_MINUTES
 } from '../calendarTimeGrid.js'
+import {
+  buildSecondaryRulerMarks,
+  formatTimeZoneLabel,
+  formatTimeZoneReference,
+  resolveTimeZone
+} from '../calendarTimeZones.js'
 import { getEventColor, isSourceEnabled } from '../calendarViewModel.js'
 import { durationMs, effectiveEnd, isLongSession, isRunning, formatDuration } from '../trackedTime.js'
 
@@ -22,16 +30,50 @@ function getCurrentMinutes(date) {
   return date.getHours() * 60 + date.getMinutes()
 }
 
-function formatTimezoneOffset(date) {
-  // getTimezoneOffset() is minutes *behind* UTC, so the sign is inverted.
-  const offsetMinutes = -date.getTimezoneOffset()
-  const sign = offsetMinutes < 0 ? '-' : '+'
-  const hours = Math.floor(Math.abs(offsetMinutes) / 60)
-  const minutes = Math.abs(offsetMinutes) % 60
+function getPreviewGeometry(times, timeZone) {
+  const start = new Date(times.start)
+  const end = new Date(times.end)
+  const dayStart = startOfDay(start, { in: tz(timeZone) })
 
-  return `GMT${sign}${String(hours).padStart(2, '0')}${
-    minutes ? `:${String(minutes).padStart(2, '0')}` : ''
-  }`
+  const startMinutes = differenceInMinutes(start, dayStart)
+  const durationMinutes = Math.max(SNAP_MINUTES, differenceInMinutes(end, start))
+
+  return {
+    top: (startMinutes / 60) * HOUR_HEIGHT,
+    height: (durationMinutes / 60) * HOUR_HEIGHT
+  }
+}
+
+function TimeLabel({ hour, secondaryTimes }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <span
+      className="calendar-week__time-label"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      style={{ top: hour * HOUR_HEIGHT }}
+    >
+      {String(hour).padStart(2, '0')}:00
+      {isOpen && secondaryTimes.length > 0 && (
+        <Popover onClose={() => setIsOpen(false)} position="right">
+          <div className="calendar-week__timezone-popover">
+            {secondaryTimes.map(({ zone, city, note, localTime }) => (
+              <div className="calendar-week__timezone-popover__row" key={zone}>
+                <span className="calendar-week__timezone-popover__time">{localTime}</span>
+                <span className="calendar-week__timezone-popover__zone">
+                  {formatTimeZoneReference(zone, new Date())} ({city ?? zone})
+                </span>
+                {note && (
+                  <span className="calendar-week__timezone-popover__note">{note}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </Popover>
+      )}
+    </span>
+  )
 }
 
 function hasSameTimes(event, times) {
@@ -54,18 +96,6 @@ function getTrackedLabel(event, now) {
   return `${event.title} · ${start}${separator}${end} · ${formatDuration(durationMs(event, now))}${warning}`
 }
 
-function getPreviewGeometry(times) {
-  const start = new Date(times.start)
-  const end = new Date(times.end)
-  const startMinutes = differenceInMinutes(start, startOfDay(start))
-  const durationMinutes = Math.max(SNAP_MINUTES, differenceInMinutes(end, start))
-
-  return {
-    top: (startMinutes / 60) * HOUR_HEIGHT,
-    height: (durationMinutes / 60) * HOUR_HEIGHT
-  }
-}
-
 export function CalendarGrid({
   anchorDate,
   calendarView,
@@ -76,9 +106,14 @@ export function CalendarGrid({
   onEventTimeChange,
   onHideEvent,
   preferences,
-  sessionActions
+  secondaryTimeZones = [],
+  sessionActions,
+  timeZone: timeZoneProp,
+  timeZoneCity: timeZoneCityProp
 }) {
-  const days = getViewDays(calendarView, anchorDate)
+  const timeZone = resolveTimeZone(timeZoneProp)
+  const timeZoneCity = timeZoneCityProp
+  const days = getViewDays(calendarView, anchorDate, timeZone)
   const viewportRef = useRef(null)
   const todayRef = useRef(null)
   const timeScrollRef = useRef(null)
@@ -167,13 +202,15 @@ export function CalendarGrid({
             end: event.end,
             allDay: event.allDay,
             deltaDays,
-            deltaMinutes: event.allDay ? 0 : deltaMinutes
+            deltaMinutes: event.allDay ? 0 : deltaMinutes,
+            timeZone
           })
         : getResizeResult({
             start: event.start,
             end: event.end,
             edge: mode === 'resize-start' ? 'start' : 'end',
-            deltaMinutes
+            deltaMinutes,
+            timeZone
           })
 
     state.times = times
@@ -223,12 +260,19 @@ export function CalendarGrid({
           start: event.start,
           end: event.end,
           allDay: event.allDay,
-          deltaDays: keyEvent.key === 'ArrowLeft' ? -1 : 1
+          deltaDays: keyEvent.key === 'ArrowLeft' ? -1 : 1,
+          timeZone
         })
       } else if (keyEvent.shiftKey) {
-        times = getResizeResult({ start: event.start, end: event.end, edge: 'end', deltaMinutes })
+        times = getResizeResult({
+          start: event.start,
+          end: event.end,
+          edge: 'end',
+          deltaMinutes,
+          timeZone
+        })
       } else {
-        times = getMoveResult({ start: event.start, end: event.end, deltaMinutes })
+        times = getMoveResult({ start: event.start, end: event.end, deltaMinutes, timeZone })
       }
 
       keyEvent.preventDefault()
@@ -240,20 +284,38 @@ export function CalendarGrid({
   // The lane is reserved whenever the source is on, even on a day with nothing tracked,
   // so scheduled events keep the same width as you page through the weeks.
   const showTrackedLane = isSourceEnabled(preferences, 'timetracker')
-  const layouts = days.map((day) => buildDayLayout(events, day, { now: now.getTime() }))
+  const layouts = days.map((day) =>
+    buildDayLayout(events, day, { now: now.getTime(), timeZone })
+  )
   const rangeContainsToday = days.some((day) => isToday(day))
-  const currentTimeTop = (getCurrentMinutes(now) / 60) * HOUR_HEIGHT
+  const currentTimeTop = (getCurrentMinutes(new TZDate(now.getTime(), timeZone)) / 60) * HOUR_HEIGHT
+
+  const secondaryRulerMarks = useMemo(
+    () =>
+      secondaryTimeZones.map((entry) => ({
+        ...entry,
+        marks: buildSecondaryRulerMarks(days[0], timeZone, entry.zone)
+      })),
+    [days, timeZone, secondaryTimeZones]
+  )
 
   return (
     <section
       className={`calendar-grid${drag ? ' is-dragging' : ''}`}
-      aria-label={formatViewLabel(calendarView, anchorDate)}
+      aria-label={formatViewLabel(calendarView, anchorDate, timeZone)}
     >
       <div className="calendar-grid-viewport" ref={viewportRef}>
-        <div className="calendar-week" style={{ '--calendar-day-count': days.length }}>
+        <div
+          className="calendar-week"
+          style={{
+            '--calendar-day-count': days.length
+          }}
+        >
           <div className="calendar-week__day-headers">
             <div className="calendar-week__corner">
-              <span className="calendar-week__timezone">{formatTimezoneOffset(now)}</span>
+              <span className="calendar-week__timezone">
+                {formatTimeZoneLabel(timeZone, timeZoneCity, now)}
+              </span>
             </div>
             {days.map((day) => {
               const currentDay = isToday(day)
@@ -317,10 +379,34 @@ export function CalendarGrid({
           <div className="calendar-week__time-scroll" ref={timeScrollRef}>
             <div className="calendar-week__time-grid" style={{ height: 24 * HOUR_HEIGHT }}>
               <div className="calendar-week__time-labels">
-                {HOURS.map((hour) => (
-                  <span key={hour} style={{ top: hour * HOUR_HEIGHT }}>
-                    {String(hour).padStart(2, '0')}:00
-                  </span>
+                <div className="calendar-week__time-labels-primary">
+                  {HOURS.map((hour) => {
+                    const instant = new Date(days[0].getTime() + hour * 60 * 60 * 1000)
+                    const secondaryTimes = secondaryTimeZones.map((entry) => ({
+                      ...entry,
+                      localTime: format(new TZDate(instant, entry.zone), 'HH:mm')
+                    }))
+
+                    return (
+                      <TimeLabel
+                        hour={hour}
+                        key={hour}
+                        secondaryTimes={secondaryTimes}
+                      />
+                    )
+                  })}
+                </div>
+                {secondaryRulerMarks.map((entry) => (
+                  <div className="calendar-week__time-labels-secondary" key={entry.zone}>
+                    {entry.marks.map((mark) => (
+                      <span
+                        key={mark.minute}
+                        style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
+                      >
+                        {mark.label}
+                      </span>
+                    ))}
+                  </div>
                 ))}
               </div>
               {layouts.map((layout, dayIndex) => {
@@ -336,7 +422,7 @@ export function CalendarGrid({
                       const event = position.event
                       const dragging = drag?.eventId === event.id
                       const geometry = dragging
-                        ? getPreviewGeometry(drag.times)
+                        ? getPreviewGeometry(drag.times, timeZone)
                         : {
                             top: (position.startMinutes / 60) * HOUR_HEIGHT,
                             height: (position.durationMinutes / 60) * HOUR_HEIGHT
@@ -431,6 +517,16 @@ export function CalendarGrid({
                   </div>
                 )
               })}
+              {secondaryRulerMarks.map((entry) =>
+                entry.marks.map((mark) => (
+                  <div
+                    aria-hidden="true"
+                    className="calendar-week__secondary-ruler"
+                    key={`${entry.zone}-${mark.minute}`}
+                    style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
+                  />
+                ))
+              )}
               {rangeContainsToday && (
                 <div
                   className="calendar-week__current-time"

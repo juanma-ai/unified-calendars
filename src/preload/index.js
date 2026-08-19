@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld('calendarAPI', {
     ipcRenderer.invoke('preferences:toggleFocusedCalendar', calendarId),
   setSourceEnabled: (source, enabled) =>
     ipcRenderer.invoke('preferences:setSourceEnabled', source, enabled),
+  setTimeZone: (timeZone, city) => ipcRenderer.invoke('preferences:setTimeZone', timeZone, city),
+  setTimeZoneCity: (city) => ipcRenderer.invoke('preferences:setTimeZoneCity', city),
+  setSecondaryTimeZones: (zones) => ipcRenderer.invoke('preferences:setSecondaryTimeZones', zones),
+  setSecondaryTimeZoneNote: (zone, note) =>
+    ipcRenderer.invoke('preferences:setSecondaryTimeZoneNote', zone, note),
   hideEvent: (hiddenEvent) => ipcRenderer.invoke('preferences:hideEvent', hiddenEvent),
   restoreHiddenEvent: (key) => ipcRenderer.invoke('preferences:restoreHiddenEvent', key),
   onOpenSettings: (callback) => {
