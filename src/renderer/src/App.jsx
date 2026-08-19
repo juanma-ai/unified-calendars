@@ -381,8 +381,6 @@ export function App() {
         onNavigate={setAnchorDate}
         onOpenSettings={openSettings}
         onRefresh={handleRefreshNow}
-        onSecondaryTimeZonesChange={handleSecondaryTimeZonesChange}
-        onTimeZoneChange={handleTimeZoneChange}
         onViewChange={handleViewChange}
         refreshing={refreshing}
         secondaryTimeZones={preferences.secondaryTimeZones}

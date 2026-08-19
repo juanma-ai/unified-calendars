@@ -1,3 +1,7 @@
+// The offset comes straight from date-fns rather than from calendarTimeZones.js, which
+// already imports this module — one-way dependency, no cycle.
+import { tzOffset } from '@date-fns/tz'
+
 export const CITY_TIME_ZONES = [
   { city: 'Lisbon', zone: 'Europe/Lisbon', aliases: ['Lisboa'] },
   { city: 'London', zone: 'Europe/London', aliases: [] },
@@ -52,24 +56,141 @@ export function getCityForZone(zone) {
   return match?.city ?? null
 }
 
+// The full IANA database the runtime already ships — 400-odd zones, against the 46 above
+// that were typed by hand. The curated table stays for what it alone knows: aliases people
+// actually type (SF, NYC), accented names the ids cannot carry (São Paulo), and which
+// cities deserve to rank first.
+const ALL_ZONES = Intl.supportedValuesOf('timeZone')
+
+const AREA_LABELS = {
+  Africa: 'Africa',
+  America: 'Americas',
+  Antarctica: 'Polar',
+  Arctic: 'Polar',
+  Asia: 'Asia',
+  Atlantic: 'Atlantic',
+  Australia: 'Australia',
+  Europe: 'Europe',
+  Indian: 'Indian Ocean',
+  Pacific: 'Pacific'
+}
+
+// The three regions most people need, then the rest alphabetically.
+const AREA_ORDER = ['America', 'Europe', 'Asia']
+
+// `Sao_Paulo` in an id, `São Paulo` on a keyboard: compare with the accents stripped so
+// both spellings find each other.
+function normalize(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+export function getZoneArea(zone) {
+  return zone.split('/')[0]
+}
+
+// `America/New_York` -> `New York`; `America/Argentina/Salta` -> `Salta — Argentina`, since
+// the bare last segment loses the only context that tells two Saltas apart.
+export function formatZoneCity(zone) {
+  const curated = getCityForZone(zone)
+  if (curated) return curated
+
+  const segments = zone.split('/').slice(1).map((segment) => segment.replace(/_/g, ' '))
+  const city = segments.pop()
+  return segments.length ? `${city} — ${segments.join(' ')}` : city
+}
+
+export function listZoneAreas() {
+  const counts = new Map()
+  for (const zone of ALL_ZONES) {
+    const area = getZoneArea(zone)
+    counts.set(area, (counts.get(area) ?? 0) + 1)
+  }
+
+  // Antarctica and Arctic share one label, so they collapse into a single Polar entry.
+  const areas = new Map()
+  for (const [area, count] of counts) {
+    const label = AREA_LABELS[area] ?? area
+    const existing = areas.get(label)
+    areas.set(label, {
+      label,
+      value: existing?.value ?? area,
+      count: (existing?.count ?? 0) + count
+    })
+  }
+
+  return [...areas.values()].sort((a, b) => {
+    const aRank = AREA_ORDER.indexOf(a.value)
+    const bRank = AREA_ORDER.indexOf(b.value)
+    if (aRank !== bRank) return (aRank < 0 ? 99 : aRank) - (bRank < 0 ? 99 : bRank)
+    return a.label.localeCompare(b.label)
+  })
+}
+
+// Every zone of an area, bucketed by its offset right now. What matters for the calendar is
+// the offset, not the geography — two cities in one bucket are interchangeable — so the
+// buckets are the unit of choice, and a well-known city in each one anchors it.
+export function listZonesByArea(area, date = new Date()) {
+  const label = AREA_LABELS[area] ?? area
+  const zones = ALL_ZONES.filter(
+    (zone) => (AREA_LABELS[getZoneArea(zone)] ?? getZoneArea(zone)) === label
+  )
+
+  const buckets = new Map()
+  for (const zone of zones) {
+    const offset = tzOffset(zone, date)
+    const bucket = buckets.get(offset) ?? { offset, cities: [], reference: null }
+    bucket.cities.push({ zone, city: formatZoneCity(zone) })
+    if (!bucket.reference && CITY_TIME_ZONES.some((entry) => entry.zone === zone)) {
+      bucket.reference = getCityForZone(zone)
+    }
+    buckets.set(offset, bucket)
+  }
+
+  return [...buckets.values()]
+    .sort((a, b) => a.offset - b.offset)
+    .map((bucket) => ({
+      ...bucket,
+      cities: bucket.cities.sort((a, b) => a.city.localeCompare(b.city))
+    }))
+}
+
 export function searchCities(query) {
-  const normalized = query.trim().toLowerCase()
+  const normalized = normalize(query)
   if (!normalized) return []
 
-  const matches = CITY_TIME_ZONES.filter((entry) => {
-    const haystack = [entry.city, ...entry.aliases].map((value) => value.toLowerCase())
-    return haystack.some((value) => value.includes(normalized))
-  })
+  const curatedByZone = new Map(CITY_TIME_ZONES.map((entry) => [entry.zone, entry]))
+  const seen = new Set()
+  const matches = []
 
-  matches.sort((a, b) => {
-    const aName = a.city.toLowerCase()
-    const bName = b.city.toLowerCase()
-    const aStartsWith = aName.startsWith(normalized)
-    const bStartsWith = bName.startsWith(normalized)
-    if (aStartsWith && !bStartsWith) return -1
-    if (!aStartsWith && bStartsWith) return 1
-    return aName.localeCompare(bName)
-  })
+  // The curated entries first: they carry the aliases, and several of them share a zone
+  // (Boston and New York both mean America/New_York), so they cannot be derived from ids.
+  for (const entry of CITY_TIME_ZONES) {
+    const haystack = [entry.city, ...entry.aliases].map(normalize)
+    if (haystack.some((value) => value.includes(normalized))) {
+      matches.push({ ...entry, popular: true })
+      seen.add(`${entry.city}-${entry.zone}`)
+    }
+  }
 
-  return matches
+  for (const zone of ALL_ZONES) {
+    if (curatedByZone.has(zone)) continue
+    const city = formatZoneCity(zone)
+    if (!normalize(`${city} ${zone}`).includes(normalized)) continue
+    const key = `${city}-${zone}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    matches.push({ city, zone, aliases: [], popular: false })
+  }
+
+  return matches.sort((a, b) => {
+    if (a.popular !== b.popular) return a.popular ? -1 : 1
+    const aStarts = normalize(a.city).startsWith(normalized)
+    const bStarts = normalize(b.city).startsWith(normalized)
+    if (aStarts !== bStarts) return aStarts ? -1 : 1
+    return a.city.localeCompare(b.city)
+  })
 }

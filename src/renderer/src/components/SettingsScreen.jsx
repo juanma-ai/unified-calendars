@@ -12,11 +12,16 @@ import {
   SearchControl,
   TabPanel
 } from '@wordpress/components'
+import { chevronDown, chevronUp } from '@wordpress/icons'
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { getIpcErrorMessage } from '../ipcErrors.js'
-import { formatTimeZoneAbbreviation } from '../calendarTimeZones.js'
-import { searchCities } from '../cityTimeZones.js'
+import {
+  formatTimeZoneReference,
+  formatZoneName,
+  MAX_SECONDARY_ZONES
+} from '../calendarTimeZones.js'
+import { TimeZonePicker } from './TimeZonePicker.jsx'
 
 const SOURCE_NAMES = {
   google: 'Google Calendar',
@@ -534,6 +539,47 @@ function CalendarsTab({ calendars, onVisibilityChange }) {
   )
 }
 
+function ZoneRow({ canMoveDown, canMoveUp, entry, onMove, onNoteChange, onRemove }) {
+  return (
+    <li className="settings-zone">
+      <span className="settings-zone__name">{formatZoneName(entry.zone, entry.city)}</span>
+      <span className="settings-zone__offset">
+        {formatTimeZoneReference(entry.zone, new Date())}
+      </span>
+      <TextControl
+        __nextHasNoMarginBottom
+        className="settings-zone__note"
+        hideLabelFromVision
+        label={`Note for ${formatZoneName(entry.zone, entry.city)}`}
+        onChange={(note) => onNoteChange(entry.zone, note)}
+        placeholder="Note (optional)"
+        value={entry.note ?? ''}
+      />
+      <span className="settings-zone__actions">
+        {/* The grid draws the columns in array order, so this is how you choose which
+            secondary zone sits next to the hour labels. */}
+        <Button
+          disabled={!canMoveUp}
+          icon={chevronUp}
+          label={`Move ${formatZoneName(entry.zone, entry.city)} left`}
+          onClick={() => onMove(entry.zone, -1)}
+          size="small"
+        />
+        <Button
+          disabled={!canMoveDown}
+          icon={chevronDown}
+          label={`Move ${formatZoneName(entry.zone, entry.city)} right`}
+          onClick={() => onMove(entry.zone, 1)}
+          size="small"
+        />
+        <Button isDestructive onClick={() => onRemove(entry.zone)} variant="link">
+          Remove
+        </Button>
+      </span>
+    </li>
+  )
+}
+
 function TimeZonesTab({
   secondaryTimeZones,
   timeZone,
@@ -542,118 +588,96 @@ function TimeZonesTab({
   onSecondaryTimeZonesChange,
   onTimeZoneChange
 }) {
-  const [primaryQuery, setPrimaryQuery] = useState('')
-  const [secondaryQuery, setSecondaryQuery] = useState('')
-  const [secondaryNote, setSecondaryNote] = useState('')
-
-  const primaryResults = searchCities(primaryQuery)
-  const secondaryResults = searchCities(secondaryQuery)
+  const isFull = secondaryTimeZones.length >= MAX_SECONDARY_ZONES
 
   function addSecondaryZone(zone, city) {
-    if (!zone || secondaryTimeZones.some((item) => item.zone === zone)) return
-    onSecondaryTimeZonesChange([...secondaryTimeZones, { zone, city, note: secondaryNote }])
-    setSecondaryQuery('')
-    setSecondaryNote('')
+    if (!zone || isFull || secondaryTimeZones.some((item) => item.zone === zone)) return
+    onSecondaryTimeZonesChange([...secondaryTimeZones, { zone, city, note: '' }])
   }
 
   function removeSecondaryZone(zone) {
     onSecondaryTimeZonesChange(secondaryTimeZones.filter((item) => item.zone !== zone))
   }
 
-  function handleNoteChange(zone, note) {
-    onSecondaryTimeZoneNoteChange?.(zone, note)
+  function moveSecondaryZone(zone, delta) {
+    const index = secondaryTimeZones.findIndex((item) => item.zone === zone)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= secondaryTimeZones.length) return
+
+    const reordered = [...secondaryTimeZones]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    onSecondaryTimeZonesChange(reordered)
   }
 
   return (
-    <div className="settings-time-zones">
-      <p className="settings-time-zones__intro">
-        The primary zone is what the day and week grids are laid out against.
-        Secondary zones are shown as read-only rulers next to the hour labels.
-      </p>
+    <div className="settings-card-grid">
+      <Card className="settings-card">
+        <CardHeader>
+          <h2>Primary time zone</h2>
+          <span className="settings-badge is-neutral">
+            {formatZoneName(timeZone, timeZoneCity)} · {formatTimeZoneReference(timeZone, new Date())}
+          </span>
+        </CardHeader>
+        <CardBody>
+          <p>Everything on the day and week grids is laid out against this zone.</p>
+          <TimeZonePicker
+            currentZone={timeZone}
+            label="Change to another city"
+            onChange={onTimeZoneChange}
+          />
+        </CardBody>
+      </Card>
 
-      <div className="settings-time-zones__section">
-        <h3>Primary time zone</h3>
-        <TextControl
-          __nextHasNoMarginBottom
-          label="Search city"
-          value={primaryQuery}
-          onChange={setPrimaryQuery}
-        />
-        {primaryQuery && primaryResults.length > 0 && (
-          <ul className="settings-time-zones__results">
-            {primaryResults.slice(0, 8).map((result) => (
-              <li key={result.zone}>
-                <Button
-                  variant="link"
-                  onClick={() => {
-                    onTimeZoneChange(result.zone)
-                    setPrimaryQuery('')
-                  }}
-                >
-                  {result.city} ({result.zone})
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="settings-time-zones__current">
-          Current: {formatTimeZoneAbbreviation(timeZone, new Date())} ({timeZoneCity ?? timeZone})
-        </p>
-      </div>
+      <Card className="settings-card">
+        <CardHeader>
+          <h2>Secondary time zones</h2>
+          <span className="settings-zone-count">
+            {secondaryTimeZones.length} of {MAX_SECONDARY_ZONES} used
+          </span>
+        </CardHeader>
+        <CardBody>
+          <p>
+            Each one adds a read-only column of hour labels beside the primary zone on the day
+            and week grids.
+          </p>
 
-      <div className="settings-time-zones__section">
-        <h3>Secondary time zones</h3>
-          <TextControl
-          __nextHasNoMarginBottom
-          label="Search city to add"
-          value={secondaryQuery}
-          onChange={setSecondaryQuery}
-        />
-        <TextControl
-          __nextHasNoMarginBottom
-          label="Note (optional)"
-          value={secondaryNote}
-          onChange={setSecondaryNote}
-        />
-        {secondaryQuery && secondaryResults.length > 0 && (
-          <ul className="settings-time-zones__results">
-            {secondaryResults.slice(0, 8).map((result) => (
-              <li key={result.zone}>
-                <Button variant="link" onClick={() => addSecondaryZone(result.zone, result.city)}>
-                  {result.city} ({result.zone})
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {secondaryTimeZones.length > 0 && (
-          <ul className="settings-time-zones__list">
-            {secondaryTimeZones.map((entry) => (
-              <li key={entry.zone}>
-                <div className="settings-time-zones__entry">
-                  <span>
-                    {formatTimeZoneAbbreviation(entry.zone, new Date())} ({entry.city ?? entry.zone})
-                  </span>
-                  <TextControl
-                    __nextHasNoMarginBottom
-                    label="Note"
-                    hideLabelFromVision
-                    placeholder="Note"
-                    value={entry.note ?? ''}
-                    onChange={(note) => handleNoteChange(entry.zone, note)}
-                  />
-                  <Button variant="link" isDestructive onClick={() => removeSecondaryZone(entry.zone)}>
-                    Remove
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+          {secondaryTimeZones.length === 0 ? (
+            <div className="settings-empty-state">
+              <p>No secondary zones yet. Add a city to see its hours next to yours.</p>
+            </div>
+          ) : (
+            <ul className="settings-zone-list">
+              {secondaryTimeZones.map((entry, index) => (
+                <ZoneRow
+                  canMoveDown={index < secondaryTimeZones.length - 1}
+                  canMoveUp={index > 0}
+                  entry={entry}
+                  key={entry.zone}
+                  onMove={moveSecondaryZone}
+                  onNoteChange={onSecondaryTimeZoneNoteChange}
+                  onRemove={removeSecondaryZone}
+                />
+              ))}
+            </ul>
+          )}
+
+          <TimeZonePicker
+            currentZone={secondaryTimeZones.at(-1)?.zone ?? timeZone}
+            disabled={isFull}
+            label="Add a city"
+            onChange={addSecondaryZone}
+          />
+          {isFull && (
+            <p className="settings-zone-hint">
+              The gutter holds {MAX_SECONDARY_ZONES}. Remove one to add another.
+            </p>
+          )}
+        </CardBody>
+      </Card>
     </div>
   )
 }
+
 
 function HiddenEventsTab({ hiddenEvents, onRestore }) {
   if (hiddenEvents.length === 0) {

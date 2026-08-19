@@ -6,29 +6,19 @@ import {
   __experimentalToggleGroupControl as ToggleGroupControl,
   __experimentalToggleGroupControlOption as ToggleGroupControlOption
 } from '@wordpress/components'
-import { useMemo, useState } from 'react'
+import { TZDate } from '@date-fns/tz'
+import { format } from 'date-fns'
 import { formatViewLabel, navigateView, VIEW_LABELS, VIEWS } from '../calendarViews.js'
-import { formatTimeZoneLabel } from '../calendarTimeZones.js'
-import { searchCities } from '../cityTimeZones.js'
-import { TimeZonePicker } from './TimeZonePicker.jsx'
+import {
+  formatTimeZoneLabel,
+  formatTimeZoneReference,
+  formatZoneName
+} from '../calendarTimeZones.js'
 
-function TimeZoneControl({
-  onSecondaryTimeZonesChange,
-  onTimeZoneChange,
-  secondaryTimeZones,
-  timeZone,
-  timeZoneCity
-}) {
-  const [secondaryNote, setSecondaryNote] = useState('')
-
-  function addSecondaryZone(zone, city) {
-    if (!zone || secondaryTimeZones.some((item) => item.zone === zone)) return
-    onSecondaryTimeZonesChange([...secondaryTimeZones, { zone, city, note: secondaryNote }])
-  }
-
-  function removeSecondaryZone(zone) {
-    onSecondaryTimeZonesChange(secondaryTimeZones.filter((item) => item.zone !== zone))
-  }
+// Read-only on purpose: zones are managed in Settings, so there is one list to keep right
+// rather than two screens that can disagree.
+function TimeZoneControl({ onOpenSettings, secondaryTimeZones, timeZone, timeZoneCity }) {
+  const now = new Date()
 
   return (
     <Dropdown
@@ -36,41 +26,40 @@ function TimeZoneControl({
       popoverProps={{ placement: 'bottom-end' }}
       renderToggle={({ onToggle }) => (
         <Button variant="secondary" onClick={onToggle}>
-          {formatTimeZoneLabel(timeZone, timeZoneCity, new Date())}
+          {formatTimeZoneLabel(timeZone, timeZoneCity, now)}
         </Button>
       )}
       renderContent={() => (
         <div className="app-header__timezone-popover">
-          <h4>Primary time zone</h4>
-          <TimeZonePicker onChange={onTimeZoneChange} placeholder="Search city" />
-
-          <div className="app-header__timezone-secondary">
-            <h4>Add secondary time zone</h4>
-            <TimeZonePicker
-              allowNote
-              note={secondaryNote}
-              onChange={addSecondaryZone}
-              onNoteChange={setSecondaryNote}
-              placeholder="Search city to add"
-            />
-          </div>
-
-          {secondaryTimeZones.length > 0 && (
-            <ul className="app-header__timezone-secondary-list">
-              {secondaryTimeZones.map((entry) => (
-                <li key={entry.zone}>
-                  <span>{entry.city ?? entry.zone}</span>
-                  <Button
-                    variant="link"
-                    isDestructive
-                    onClick={() => removeSecondaryZone(entry.zone)}
-                  >
-                    Remove
-                  </Button>
+          <ul className="app-header__timezone-list">
+            {[{ zone: timeZone, city: timeZoneCity, primary: true }, ...secondaryTimeZones].map(
+              (entry) => (
+                <li
+                  className={`app-header__timezone${entry.primary ? ' is-primary' : ''}`}
+                  key={entry.zone}
+                >
+                  <span className="app-header__timezone-time">
+                    {format(new TZDate(now, entry.zone), 'HH:mm')}
+                  </span>
+                  <span className="app-header__timezone-name">
+                    {formatZoneName(entry.zone, entry.city)}
+                    {entry.primary && <em>primary</em>}
+                  </span>
+                  <span className="app-header__timezone-offset">
+                    {formatTimeZoneReference(entry.zone, now)}
+                  </span>
+                  {entry.note && <span className="app-header__timezone-note">{entry.note}</span>}
                 </li>
-              ))}
-            </ul>
-          )}
+              )
+            )}
+          </ul>
+          <Button
+            className="app-header__timezone-manage"
+            onClick={() => onOpenSettings('time-zones')}
+            variant="secondary"
+          >
+            Manage time zones
+          </Button>
         </div>
       )}
     />
@@ -83,8 +72,6 @@ export function AppHeader({
   onNavigate,
   onOpenSettings,
   onRefresh,
-  onSecondaryTimeZonesChange,
-  onTimeZoneChange,
   onViewChange,
   refreshing,
   secondaryTimeZones,
@@ -126,8 +113,7 @@ export function AppHeader({
 
       <div className="app-header__actions">
         <TimeZoneControl
-          onSecondaryTimeZonesChange={onSecondaryTimeZonesChange}
-          onTimeZoneChange={onTimeZoneChange}
+          onOpenSettings={onOpenSettings}
           secondaryTimeZones={secondaryTimeZones}
           timeZone={timeZone}
           timeZoneCity={timeZoneCity}

@@ -1,4 +1,3 @@
-import { Popover } from '@wordpress/components'
 import { TZDate, tz } from '@date-fns/tz'
 import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -15,8 +14,10 @@ import {
 } from '../calendarTimeGrid.js'
 import {
   buildSecondaryRulerMarks,
-  formatTimeZoneLabel,
   formatTimeZoneReference,
+  formatZoneName,
+  getZoneOffsetsDiffer,
+  MAX_SECONDARY_ZONES,
   resolveTimeZone
 } from '../calendarTimeZones.js'
 import { getEventColor, isSourceEnabled } from '../calendarViewModel.js'
@@ -44,35 +45,32 @@ function getPreviewGeometry(times, timeZone) {
   }
 }
 
-function TimeLabel({ hour, secondaryTimes }) {
-  const [isOpen, setIsOpen] = useState(false)
+// One header per gutter column, so a bare `17:00` two columns over still says which city it
+// belongs to. The note, and any DST caveat, ride along in the tooltip.
+function ZoneColumnHeader({ city, isPrimary, note, offsetsDiffer, zone }) {
+  const name = formatZoneName(zone, city)
+  const title = [
+    `${name} — ${zone}`,
+    note,
+    offsetsDiffer ? 'Clocks change inside this range, so the offset is not the same every day.'
+      : null
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return (
-    <span
-      className="calendar-week__time-label"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-      style={{ top: hour * HOUR_HEIGHT }}
+    <div
+      className={`calendar-week__zone-header${isPrimary ? ' is-primary' : ''}`}
+      title={title}
     >
-      {String(hour).padStart(2, '0')}:00
-      {isOpen && secondaryTimes.length > 0 && (
-        <Popover onClose={() => setIsOpen(false)} position="right">
-          <div className="calendar-week__timezone-popover">
-            {secondaryTimes.map(({ zone, city, note, localTime }) => (
-              <div className="calendar-week__timezone-popover__row" key={zone}>
-                <span className="calendar-week__timezone-popover__time">{localTime}</span>
-                <span className="calendar-week__timezone-popover__zone">
-                  {formatTimeZoneReference(zone, new Date())} ({city ?? zone})
-                </span>
-                {note && (
-                  <span className="calendar-week__timezone-popover__note">{note}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </Popover>
-      )}
-    </span>
+      <span className="calendar-week__zone-header__city">
+        {name}
+        {offsetsDiffer && <abbr aria-label="Clocks change inside this range">*</abbr>}
+      </span>
+      <span className="calendar-week__zone-header__offset">
+        {formatTimeZoneReference(zone, new Date())}
+      </span>
+    </div>
   )
 }
 
@@ -290,11 +288,15 @@ export function CalendarGrid({
   const rangeContainsToday = days.some((day) => isToday(day))
   const currentTimeTop = (getCurrentMinutes(new TZDate(now.getTime(), timeZone)) / 60) * HOUR_HEIGHT
 
+  // Two is what the gutter can carry before it starts eating the day columns.
   const secondaryRulerMarks = useMemo(
     () =>
-      secondaryTimeZones.map((entry) => ({
+      secondaryTimeZones.slice(0, MAX_SECONDARY_ZONES).map((entry) => ({
         ...entry,
-        marks: buildSecondaryRulerMarks(days[0], timeZone, entry.zone)
+        marks: buildSecondaryRulerMarks(days[0], timeZone, entry.zone),
+        // One gutter cannot be right for every day of a week that crosses a clock change,
+        // so the column header owns up to it instead of quietly drifting by an hour.
+        offsetsDiffer: getZoneOffsetsDiffer(days, timeZone, entry.zone)
       })),
     [days, timeZone, secondaryTimeZones]
   )
@@ -308,14 +310,22 @@ export function CalendarGrid({
         <div
           className="calendar-week"
           style={{
-            '--calendar-day-count': days.length
+            '--calendar-day-count': days.length,
+            '--calendar-secondary-zone-count': secondaryRulerMarks.length
           }}
         >
           <div className="calendar-week__day-headers">
             <div className="calendar-week__corner">
-              <span className="calendar-week__timezone">
-                {formatTimeZoneLabel(timeZone, timeZoneCity, now)}
-              </span>
+              <ZoneColumnHeader city={timeZoneCity} isPrimary zone={timeZone} />
+              {secondaryRulerMarks.map((entry) => (
+                <ZoneColumnHeader
+                  city={entry.city}
+                  key={entry.zone}
+                  note={entry.note}
+                  offsetsDiffer={entry.offsetsDiffer}
+                  zone={entry.zone}
+                />
+              ))}
             </div>
             {days.map((day) => {
               const currentDay = isToday(day)
@@ -379,31 +389,33 @@ export function CalendarGrid({
           <div className="calendar-week__time-scroll" ref={timeScrollRef}>
             <div className="calendar-week__time-grid" style={{ height: 24 * HOUR_HEIGHT }}>
               <div className="calendar-week__time-labels">
-                <div className="calendar-week__time-labels-primary">
-                  {HOURS.map((hour) => {
-                    const instant = new Date(days[0].getTime() + hour * 60 * 60 * 1000)
-                    const secondaryTimes = secondaryTimeZones.map((entry) => ({
-                      ...entry,
-                      localTime: format(new TZDate(instant, entry.zone), 'HH:mm')
-                    }))
-
-                    return (
-                      <TimeLabel
-                        hour={hour}
-                        key={hour}
-                        secondaryTimes={secondaryTimes}
-                      />
-                    )
-                  })}
+                <div className="calendar-week__time-column is-primary">
+                  {HOURS.map((hour) => (
+                    <span
+                      className="calendar-week__time-label"
+                      key={hour}
+                      style={{ top: hour * HOUR_HEIGHT }}
+                    >
+                      {String(hour).padStart(2, '0')}:00
+                    </span>
+                  ))}
                 </div>
                 {secondaryRulerMarks.map((entry) => (
-                  <div className="calendar-week__time-labels-secondary" key={entry.zone}>
+                  <div className="calendar-week__time-column" key={entry.zone}>
                     {entry.marks.map((mark) => (
                       <span
+                        className={`calendar-week__time-label${
+                          mark.label === '00:00' ? ' is-midnight' : ''
+                        }`}
                         key={mark.minute}
                         style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
                       >
                         {mark.label}
+                        {mark.dayOffset !== 0 && (
+                          <sup className="calendar-week__day-offset">
+                            {mark.dayOffset > 0 ? `+${mark.dayOffset}` : `\u2212${-mark.dayOffset}`}
+                          </sup>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -517,15 +529,19 @@ export function CalendarGrid({
                   </div>
                 )
               })}
+              {/* A whole-hour zone marks the lines the grid already draws, so only the
+                  5:30/5:45 offsets earn a rule of their own. */}
               {secondaryRulerMarks.map((entry) =>
-                entry.marks.map((mark) => (
-                  <div
-                    aria-hidden="true"
-                    className="calendar-week__secondary-ruler"
-                    key={`${entry.zone}-${mark.minute}`}
-                    style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
-                  />
-                ))
+                entry.marks
+                  .filter((mark) => mark.isOffGrid)
+                  .map((mark) => (
+                    <div
+                      aria-hidden="true"
+                      className="calendar-week__secondary-ruler"
+                      key={`${entry.zone}-${mark.minute}`}
+                      style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
+                    />
+                  ))
               )}
               {rangeContainsToday && (
                 <div
