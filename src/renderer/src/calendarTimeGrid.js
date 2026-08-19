@@ -1,5 +1,5 @@
 import { tz } from '@date-fns/tz'
-import { addDays, addMinutes, differenceInMinutes, isSameDay, startOfDay } from 'date-fns'
+import { addDays, addMinutes, differenceInMinutes, startOfDay } from 'date-fns'
 import { resolveTimeZone } from './calendarTimeZones.js'
 import { effectiveEnd } from './trackedTime.js'
 
@@ -133,6 +133,10 @@ function timedPosition(event, day, timeZone) {
     startMinutes,
     durationMinutes,
     endMinutes: startMinutes + durationMinutes,
+    // The block drawn here is only the part of the event that falls inside this day, so
+    // it has to say which of its edges are the event's real ones and which are midnight.
+    continuesBefore: eventStart < dayStart,
+    continuesAfter: eventEnd > dayEnd,
     column: 0,
     columnCount: 1
   }
@@ -228,18 +232,22 @@ function assignOverlapColumns(events) {
  * time, so overlapping rows mean a damaged database, and side-by-side slivers beat bars
  * hidden behind each other.
  *
- * Selection happens here rather than in the component: a scheduled event belongs to the
- * day it starts on, but a tracked session belongs to every day it touches, or an
- * overnight session would vanish from today's column at midnight.
+ * Selection happens here rather than in the component: an event belongs to every day it
+ * touches, not only the one it starts on, or a meeting running 22:00 to 02:00 would
+ * vanish from tomorrow's column and an overnight tracked session would disappear at
+ * midnight. `timedPosition` clips each block to the day it is drawn in.
+ *
+ * All-day events are not selected here at all: they are one bar spanning the columns
+ * they cover, which is a property of the week rather than of any single day, so the
+ * grid builds that row with `buildDaySegments`.
  */
 export function buildDayLayout(events, day, { now = Date.now(), timeZone } = {}) {
-  const scheduled = events.filter(
-    (event) => !isTrackedEvent(event) && isSameDay(new Date(event.start), day)
-  )
-  const allDayEvents = scheduled.filter((event) => event.allDay)
   const timedEvents = assignOverlapColumns(
-    scheduled
-      .filter((event) => !event.allDay)
+    events
+      .filter(
+        (event) =>
+          !isTrackedEvent(event) && !event.allDay && overlapsDay(event, day, now, timeZone)
+      )
       .map((event) => timedPosition(event, day, timeZone))
   )
   const trackedEvents = assignOverlapColumns(
@@ -250,5 +258,5 @@ export function buildDayLayout(events, day, { now = Date.now(), timeZone } = {})
       .map((event) => trackedPosition(event, day, now, timeZone))
   )
 
-  return { allDayEvents, timedEvents, trackedEvents }
+  return { timedEvents, trackedEvents }
 }

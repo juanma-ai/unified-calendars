@@ -3,7 +3,12 @@ import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
 import { TrackedSessionBar } from './TrackedSessionBar.jsx'
-import { formatViewLabel, getViewDays } from '../calendarViews.js'
+import {
+  buildDaySegments,
+  formatViewLabel,
+  getEventDayRange,
+  getViewDays
+} from '../calendarViews.js'
 import {
   buildDayLayout,
   getCenteredTimeScrollTop,
@@ -149,8 +154,17 @@ export function CalendarGrid({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [cancelDrag, drag])
 
+  // `getResizeResult` measures the dragged edge from the event's own start day and caps
+  // it at that day's midnight, so it cannot express an event that runs past one. A block
+  // clipped at either end is a slice of a longer event; offering it a resize handle
+  // would snap the whole thing back inside a single day.
   const canResizeEvent = useCallback(
-    (event) => event.source === 'google' && !event.allDay && canEditEvent(event),
+    (event, position) =>
+      event.source === 'google' &&
+      !event.allDay &&
+      !position?.continuesBefore &&
+      !position?.continuesAfter &&
+      canEditEvent(event),
     [canEditEvent]
   )
 
@@ -163,7 +177,11 @@ export function CalendarGrid({
       const wrapper = pointerEvent.currentTarget.closest(
         '.calendar-week__timed-event, .calendar-week__all-day-event'
       )
-      const column = wrapper?.closest('.calendar-week__time-day, .calendar-week__all-day-cell')
+      // An all-day bar spans its columns, so it is a sibling of the day cells rather
+      // than a child of one; a cell is still what a single column measures.
+      const column =
+        wrapper?.closest('.calendar-week__time-day') ??
+        wrapper?.parentElement?.querySelector('.calendar-week__all-day-cell')
 
       suppressClickRef.current = false
       dragRef.current = {
@@ -249,7 +267,11 @@ export function CalendarGrid({
       const horizontal = keyEvent.key === 'ArrowLeft' || keyEvent.key === 'ArrowRight'
       if (!vertical && !horizontal) return
       if (vertical && event.allDay) return
-      if (vertical && keyEvent.shiftKey && !canResizeEvent(event)) return
+      // Same midnight cap as the drag handles: an event already spanning days cannot be
+      // resized without the result being clamped back into the day it starts on.
+      const { firstDay, lastDay } = getEventDayRange(event, timeZone)
+      const spansDays = firstDay.getTime() !== lastDay.getTime()
+      if (vertical && keyEvent.shiftKey && (spansDays || !canResizeEvent(event))) return
 
       const deltaMinutes = (keyEvent.key === 'ArrowUp' ? -1 : 1) * SNAP_MINUTES
       let times
@@ -276,7 +298,7 @@ export function CalendarGrid({
       keyEvent.preventDefault()
       if (!hasSameTimes(event, times)) onEventTimeChange?.(event, times)
     },
-    [canEditEvent, canResizeEvent, onEventTimeChange]
+    [canEditEvent, canResizeEvent, onEventTimeChange, timeZone]
   )
 
   // The lane is reserved whenever the source is on, even on a day with nothing tracked,
@@ -284,6 +306,13 @@ export function CalendarGrid({
   const showTrackedLane = isSourceEnabled(preferences, 'timetracker')
   const layouts = days.map((day) =>
     buildDayLayout(events, day, { now: now.getTime(), timeZone })
+  )
+  // The all-day row is built once for the whole week rather than per day: a multi-day
+  // event is a single bar spanning its columns, so no one day owns it.
+  const allDay = buildDaySegments(
+    events.filter((event) => event.allDay && event.source !== 'timetracker'),
+    days,
+    timeZone
   )
   const rangeContainsToday = days.some((day) => isToday(day))
   const currentTimeTop = (getCurrentMinutes(new TZDate(now.getTime(), timeZone)) / 60) * HOUR_HEIGHT
@@ -343,47 +372,59 @@ export function CalendarGrid({
             })}
           </div>
 
-          <div className="calendar-week__all-day">
+          <div
+            className="calendar-week__all-day"
+            style={{ '--calendar-all-day-lanes': allDay.laneCount }}
+          >
             <div className="calendar-week__all-day-label">All day</div>
-            {layouts.map((layout, dayIndex) => (
+
+            {/* The day cells only paint the column dividers and the today tint; the bars
+                span columns, so they sit in the row's own grid on top of them. */}
+            {days.map((day, dayIndex) => (
               <div
-                className={`calendar-week__all-day-cell${
-                  isToday(days[dayIndex]) ? ' is-today' : ''
-                }`}
-                key={days[dayIndex].toISOString()}
-              >
-                {layout.allDayEvents.map((event) => {
-                  const dragging = drag?.eventId === event.id
-                  return (
-                    <div
-                      className={`calendar-week__all-day-event${
-                        canEditEvent(event) ? ' is-editable' : ''
-                      }${dragging ? ' is-dragging' : ''}`}
-                      key={event.id}
-                      onClickCapture={handleClickCapture}
-                      onKeyDown={handleKeyDown(event)}
-                      onLostPointerCapture={handleDragEnd}
-                      onPointerDown={beginDrag(event, 'move')}
-                      onPointerMove={handleDragMove}
-                      onPointerUp={handleDragEnd}
-                      style={
-                        dragging
-                          ? { transform: `translateX(${drag.deltaDays * drag.dayWidth}px)` }
-                          : undefined
-                      }
-                    >
-                      <EventPill
-                        event={event}
-                        onCompleteReminder={onCompleteReminder}
-                        onHideEvent={onHideEvent}
-                        preferences={preferences}
-                        sessionActions={sessionActions}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
+                aria-hidden="true"
+                className={`calendar-week__all-day-cell${isToday(day) ? ' is-today' : ''}`}
+                key={day.toISOString()}
+                style={{ gridColumn: dayIndex + 2 }}
+              />
             ))}
+
+            {allDay.segments.map((segment) => {
+              const dragging = drag?.eventId === segment.event.id
+              return (
+                <div
+                  className={`calendar-week__all-day-event${
+                    canEditEvent(segment.event) ? ' is-editable' : ''
+                  }${dragging ? ' is-dragging' : ''}${
+                    segment.continuesBefore ? ' continues-before' : ''
+                  }${segment.continuesAfter ? ' continues-after' : ''}`}
+                  key={segment.event.id}
+                  onClickCapture={handleClickCapture}
+                  onKeyDown={handleKeyDown(segment.event)}
+                  onLostPointerCapture={handleDragEnd}
+                  onPointerDown={beginDrag(segment.event, 'move')}
+                  onPointerMove={handleDragMove}
+                  onPointerUp={handleDragEnd}
+                  style={{
+                    gridColumn: `${segment.startIndex + 2} / span ${segment.span}`,
+                    gridRow: segment.lane + 1,
+                    ...(dragging
+                      ? { transform: `translateX(${drag.deltaDays * drag.dayWidth}px)` }
+                      : null)
+                  }}
+                >
+                  <EventPill
+                    continuesAfter={segment.continuesAfter}
+                    continuesBefore={segment.continuesBefore}
+                    event={segment.event}
+                    onCompleteReminder={onCompleteReminder}
+                    onHideEvent={onHideEvent}
+                    preferences={preferences}
+                    sessionActions={sessionActions}
+                  />
+                </div>
+              )
+            })}
           </div>
 
           <div className="calendar-week__time-scroll" ref={timeScrollRef}>
@@ -444,7 +485,9 @@ export function CalendarGrid({
                         <div
                           className={`calendar-week__timed-event${
                             canEditEvent(event) ? ' is-editable' : ''
-                          }${dragging ? ' is-dragging' : ''}`}
+                          }${dragging ? ' is-dragging' : ''}${
+                            position.continuesBefore ? ' continues-before' : ''
+                          }${position.continuesAfter ? ' continues-after' : ''}`}
                           key={event.id}
                           onClickCapture={handleClickCapture}
                           onKeyDown={handleKeyDown(event)}
@@ -469,6 +512,8 @@ export function CalendarGrid({
                           }}
                         >
                           <EventPill
+                            continuesAfter={position.continuesAfter}
+                            continuesBefore={position.continuesBefore}
                             event={event}
                             onCompleteReminder={onCompleteReminder}
                             onHideEvent={onHideEvent}
@@ -476,7 +521,7 @@ export function CalendarGrid({
                             sessionActions={sessionActions}
                             showTime
                           />
-                          {canResizeEvent(event) && (
+                          {canResizeEvent(event, position) && (
                             <>
                               <span
                                 aria-hidden="true"

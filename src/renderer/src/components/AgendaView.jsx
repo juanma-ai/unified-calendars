@@ -1,19 +1,38 @@
-import { format, isToday } from 'date-fns'
+import { format, isSameDay, isToday } from 'date-fns'
 import { EventPill } from './EventPill.jsx'
-import { buildAgendaSections, formatViewLabel, getViewDays } from '../calendarViews.js'
+import {
+  buildAgendaSections,
+  formatViewLabel,
+  getEventDayRange,
+  getViewDays
+} from '../calendarViews.js'
 
-function formatEventTime(event) {
+/**
+ * What the event does on *this* day. A multi-day event appears in several sections, and
+ * printing its overall `09:00 – 18:00` in every one of them would claim it starts and
+ * ends again each morning, so each day gets only the edge that actually falls in it.
+ */
+function formatEventTime(event, day, timeZone) {
   if (event.allDay) return 'All day'
 
+  const { firstDay, lastDay } = getEventDayRange(event, timeZone)
   const start = new Date(event.start)
   const end = event.end ? new Date(event.end) : null
   if (!end || end <= start) return format(start, 'HH:mm')
+
+  if (firstDay.getTime() !== lastDay.getTime()) {
+    const isFirst = isSameDay(day, firstDay)
+    const isLast = isSameDay(day, lastDay)
+    if (isFirst) return `${format(start, 'HH:mm')} →`
+    if (isLast) return `→ ${format(end, 'HH:mm')}`
+    return 'All day'
+  }
 
   return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')}`
 }
 
 export function AgendaView({ anchorDate, events, onCompleteReminder, onHideEvent, preferences, sessionActions, timeZone }) {
-  const sections = buildAgendaSections(events, getViewDays('agenda', anchorDate, timeZone))
+  const sections = buildAgendaSections(events, getViewDays('agenda', anchorDate, timeZone), timeZone)
 
   if (sections.length === 0) {
     return (
@@ -39,7 +58,9 @@ export function AgendaView({ anchorDate, events, onCompleteReminder, onHideEvent
           <ul className="calendar-agenda__events">
             {section.events.map((event) => (
               <li className="calendar-agenda__event" key={event.id}>
-                <span className="calendar-agenda__time">{formatEventTime(event)}</span>
+                <span className="calendar-agenda__time">
+                  {formatEventTime(event, section.day, timeZone)}
+                </span>
                 <EventPill
                   onCompleteReminder={onCompleteReminder}
                   event={event}
