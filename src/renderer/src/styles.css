@@ -149,6 +149,79 @@ input {
   margin: 0 8px 0 0;
 }
 
+.app-header__timezone-control {
+  flex: 0 0 auto;
+}
+
+.app-header__timezone-popover {
+  width: 260px;
+  padding: 12px;
+}
+
+.app-header__timezone-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-header__timezone {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__timezone:last-child {
+  border-bottom: 0;
+}
+
+.app-header__timezone-time {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.app-header__timezone.is-primary .app-header__timezone-time {
+  color: var(--accent);
+}
+
+.app-header__timezone-name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header__timezone-name em {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-header__timezone-offset {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-header__timezone-note {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.app-header__timezone-manage {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+}
+
 /* Sidebar */
 
 .calendar-sidebar {
@@ -387,11 +460,20 @@ input {
 .calendar-week {
   /* Day and week are the same time grid; only the column count differs. */
   --calendar-day-count: 7;
+  /* The primary column keeps the width the ruler has always had, so a calendar with no
+     secondary zone is untouched; each secondary zone adds a narrower column of its own. */
+  --calendar-secondary-zone-count: 0;
+  --calendar-primary-column: 92px;
+  --calendar-secondary-column: 62px;
+  --calendar-ruler-width: calc(
+    var(--calendar-primary-column) + var(--calendar-secondary-column) *
+      var(--calendar-secondary-zone-count)
+  );
 
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   width: 100%;
-  min-width: calc(92px + var(--calendar-day-count) * 104px);
+  min-width: calc(var(--calendar-ruler-width) + var(--calendar-day-count) * 104px);
   height: 100%;
   min-height: 0;
 }
@@ -400,22 +482,53 @@ input {
 .calendar-week__all-day,
 .calendar-week__time-grid {
   display: grid;
-  grid-template-columns: 92px repeat(var(--calendar-day-count), minmax(104px, 1fr));
+  grid-template-columns: var(--calendar-ruler-width) repeat(var(--calendar-day-count), minmax(104px, 1fr));
 }
 
 .calendar-week__corner {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    var(--calendar-primary-column)
+    repeat(var(--calendar-secondary-zone-count), var(--calendar-secondary-column));
   align-items: flex-end;
-  justify-content: flex-end;
-  padding: 0 12px 10px;
+  padding: 0 4px 8px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 
-.calendar-week__timezone {
+.calendar-week__zone-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 0 4px;
+  text-align: right;
+}
+
+.calendar-week__zone-header__city {
+  overflow: hidden;
   color: var(--muted);
   font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-week__zone-header.is-primary .calendar-week__zone-header__city {
+  color: var(--text);
+}
+
+.calendar-week__zone-header__offset {
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.calendar-week__zone-header abbr {
+  border: 0;
+  text-decoration: none;
 }
 
 .calendar-grid-day-label {
@@ -504,13 +617,49 @@ input {
   border-right: 1px solid var(--border);
 }
 
-.calendar-week__time-labels span {
+.calendar-week__time-labels {
+  display: grid;
+  grid-template-columns:
+    var(--calendar-primary-column)
+    repeat(var(--calendar-secondary-zone-count), var(--calendar-secondary-column));
+}
+
+/* Each column is a real box of the grid's full height, so its absolutely positioned hour
+   labels have something to position against instead of a collapsed zero-height parent. */
+.calendar-week__time-column {
+  position: relative;
+  height: 100%;
+}
+
+.calendar-week__time-label {
   position: absolute;
-  right: 12px;
+  right: 6px;
   color: var(--muted);
-  font-size: 11px;
+  cursor: default;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.calendar-week__time-column.is-primary .calendar-week__time-label {
+  right: 8px;
+  font-size: 11px;
+}
+
+/* Midnight is where a secondary column's date turns over — worth more weight than the
+   twenty-three hours around it. */
+.calendar-week__time-label.is-midnight {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.calendar-week__day-offset {
+  margin-left: 2px;
+  font-size: 8px;
+  font-weight: 600;
+  vertical-align: super;
 }
 
 .calendar-week__time-day {
@@ -1057,6 +1206,7 @@ input {
 }
 
 .settings-card .components-card__body > p {
+  margin: 0 0 16px;
   color: #50575e;
   font-size: 13px;
   line-height: 1.5;
@@ -1072,6 +1222,14 @@ input {
   border-radius: 4px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+/* The green badge means "connected"; a time zone is just a value, not a health check. */
+.settings-badge.is-neutral {
+  color: #1e1e1e;
+  background: var(--page);
+  border-color: var(--border);
+  font-variant-numeric: tabular-nums;
 }
 
 .settings-badge.is-error {
@@ -1181,6 +1339,71 @@ input {
   font-size: 14px;
 }
 
+.settings-zone-count {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.settings-zone-list {
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+/* Fixed columns: the note field starts at the same x whether the zone is called Rome or
+   San Francisco. */
+.settings-zone {
+  display: grid;
+  grid-template-columns: 140px 60px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-zone:last-child {
+  border-bottom: 0;
+}
+
+.settings-zone__name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-zone__offset {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-zone__note .components-base-control__field {
+  margin: 0;
+}
+
+.settings-zone__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* At the cap the field stays visible so the control is still discoverable, but it has to
+   read as unavailable rather than merely unresponsive. */
+.timezone-picker .components-text-control__input:disabled {
+  color: var(--muted);
+  background: var(--page);
+  cursor: not-allowed;
+}
+
+.settings-zone-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .settings-hidden-event {
   min-height: 68px;
   padding: 12px 0;
@@ -1258,7 +1481,7 @@ input {
   position: absolute;
   z-index: 2;
   right: 0;
-  left: 92px;
+  left: var(--calendar-ruler-width);
   height: 2px;
   background: #e5484d;
   pointer-events: none;
@@ -2038,4 +2261,160 @@ input {
   pointer-events: auto;
   max-width: 480px;
   box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+/* TimeZonePicker component */
+
+.timezone-picker {
+  position: relative;
+}
+
+.timezone-picker__results {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.timezone-picker__results li {
+  min-height: 28px;
+}
+
+.timezone-picker__results .components-button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  padding: 6px 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.timezone-picker__offset {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timezone-picker__empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.timezone-picker__browse {
+  margin-top: 8px;
+}
+
+/* Region browser: for when you do not know what to type. Scrolls in its own box so that
+   144 American zones cannot push the rest of the card off screen. */
+.timezone-browser {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.timezone-browser__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timezone-browser__head .components-base-control {
+  flex: 0 0 180px;
+}
+
+.timezone-browser__head .components-base-control__field {
+  margin: 0;
+}
+
+.timezone-browser__count {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.timezone-browser__groups {
+  max-height: 320px;
+  padding: 4px 12px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.timezone-browser__group h4 {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 10px 0 6px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.timezone-browser__group h4 span {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.timezone-browser__group ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 2px 8px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+/* A dense grid of underlined links is unreadable; these behave as a list you scan, and
+   only the one under the pointer announces itself as clickable. */
+.timezone-browser__group .components-button {
+  width: 100%;
+  height: auto;
+  padding: 3px 6px;
+  color: #1e1e1e;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.timezone-browser__group .components-button:hover,
+.timezone-browser__group .components-button:focus {
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+
+/* Secondary zone ruler marks on the time grid */
+
+/* Drawn only for zones whose offset is not a whole hour, where the mark falls between two
+   hour lines. A whole-hour zone would just repaint lines the grid already has. */
+.calendar-week__secondary-ruler {
+  position: absolute;
+  z-index: 0;
+  left: var(--calendar-ruler-width);
+  right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    #e8e8e8 0,
+    #e8e8e8 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  pointer-events: none;
 }

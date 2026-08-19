@@ -1,3 +1,4 @@
+import { TZDate, tz } from '@date-fns/tz'
 import { differenceInMinutes, format, isToday, startOfDay } from 'date-fns'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EventPill } from './EventPill.jsx'
@@ -11,6 +12,14 @@ import {
   HOUR_HEIGHT,
   SNAP_MINUTES
 } from '../calendarTimeGrid.js'
+import {
+  buildSecondaryRulerMarks,
+  formatTimeZoneReference,
+  formatZoneName,
+  getZoneOffsetsDiffer,
+  MAX_SECONDARY_ZONES,
+  resolveTimeZone
+} from '../calendarTimeZones.js'
 import { getEventColor, isSourceEnabled } from '../calendarViewModel.js'
 import { durationMs, effectiveEnd, isLongSession, isRunning, formatDuration } from '../trackedTime.js'
 
@@ -22,16 +31,47 @@ function getCurrentMinutes(date) {
   return date.getHours() * 60 + date.getMinutes()
 }
 
-function formatTimezoneOffset(date) {
-  // getTimezoneOffset() is minutes *behind* UTC, so the sign is inverted.
-  const offsetMinutes = -date.getTimezoneOffset()
-  const sign = offsetMinutes < 0 ? '-' : '+'
-  const hours = Math.floor(Math.abs(offsetMinutes) / 60)
-  const minutes = Math.abs(offsetMinutes) % 60
+function getPreviewGeometry(times, timeZone) {
+  const start = new Date(times.start)
+  const end = new Date(times.end)
+  const dayStart = startOfDay(start, { in: tz(timeZone) })
 
-  return `GMT${sign}${String(hours).padStart(2, '0')}${
-    minutes ? `:${String(minutes).padStart(2, '0')}` : ''
-  }`
+  const startMinutes = differenceInMinutes(start, dayStart)
+  const durationMinutes = Math.max(SNAP_MINUTES, differenceInMinutes(end, start))
+
+  return {
+    top: (startMinutes / 60) * HOUR_HEIGHT,
+    height: (durationMinutes / 60) * HOUR_HEIGHT
+  }
+}
+
+// One header per gutter column, so a bare `17:00` two columns over still says which city it
+// belongs to. The note, and any DST caveat, ride along in the tooltip.
+function ZoneColumnHeader({ city, isPrimary, note, offsetsDiffer, zone }) {
+  const name = formatZoneName(zone, city)
+  const title = [
+    `${name} — ${zone}`,
+    note,
+    offsetsDiffer ? 'Clocks change inside this range, so the offset is not the same every day.'
+      : null
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return (
+    <div
+      className={`calendar-week__zone-header${isPrimary ? ' is-primary' : ''}`}
+      title={title}
+    >
+      <span className="calendar-week__zone-header__city">
+        {name}
+        {offsetsDiffer && <abbr aria-label="Clocks change inside this range">*</abbr>}
+      </span>
+      <span className="calendar-week__zone-header__offset">
+        {formatTimeZoneReference(zone, new Date())}
+      </span>
+    </div>
+  )
 }
 
 function hasSameTimes(event, times) {
@@ -54,18 +94,6 @@ function getTrackedLabel(event, now) {
   return `${event.title} · ${start}${separator}${end} · ${formatDuration(durationMs(event, now))}${warning}`
 }
 
-function getPreviewGeometry(times) {
-  const start = new Date(times.start)
-  const end = new Date(times.end)
-  const startMinutes = differenceInMinutes(start, startOfDay(start))
-  const durationMinutes = Math.max(SNAP_MINUTES, differenceInMinutes(end, start))
-
-  return {
-    top: (startMinutes / 60) * HOUR_HEIGHT,
-    height: (durationMinutes / 60) * HOUR_HEIGHT
-  }
-}
-
 export function CalendarGrid({
   anchorDate,
   calendarView,
@@ -76,9 +104,14 @@ export function CalendarGrid({
   onEventTimeChange,
   onHideEvent,
   preferences,
-  sessionActions
+  secondaryTimeZones = [],
+  sessionActions,
+  timeZone: timeZoneProp,
+  timeZoneCity: timeZoneCityProp
 }) {
-  const days = getViewDays(calendarView, anchorDate)
+  const timeZone = resolveTimeZone(timeZoneProp)
+  const timeZoneCity = timeZoneCityProp
+  const days = getViewDays(calendarView, anchorDate, timeZone)
   const viewportRef = useRef(null)
   const todayRef = useRef(null)
   const timeScrollRef = useRef(null)
@@ -167,13 +200,15 @@ export function CalendarGrid({
             end: event.end,
             allDay: event.allDay,
             deltaDays,
-            deltaMinutes: event.allDay ? 0 : deltaMinutes
+            deltaMinutes: event.allDay ? 0 : deltaMinutes,
+            timeZone
           })
         : getResizeResult({
             start: event.start,
             end: event.end,
             edge: mode === 'resize-start' ? 'start' : 'end',
-            deltaMinutes
+            deltaMinutes,
+            timeZone
           })
 
     state.times = times
@@ -223,12 +258,19 @@ export function CalendarGrid({
           start: event.start,
           end: event.end,
           allDay: event.allDay,
-          deltaDays: keyEvent.key === 'ArrowLeft' ? -1 : 1
+          deltaDays: keyEvent.key === 'ArrowLeft' ? -1 : 1,
+          timeZone
         })
       } else if (keyEvent.shiftKey) {
-        times = getResizeResult({ start: event.start, end: event.end, edge: 'end', deltaMinutes })
+        times = getResizeResult({
+          start: event.start,
+          end: event.end,
+          edge: 'end',
+          deltaMinutes,
+          timeZone
+        })
       } else {
-        times = getMoveResult({ start: event.start, end: event.end, deltaMinutes })
+        times = getMoveResult({ start: event.start, end: event.end, deltaMinutes, timeZone })
       }
 
       keyEvent.preventDefault()
@@ -240,20 +282,50 @@ export function CalendarGrid({
   // The lane is reserved whenever the source is on, even on a day with nothing tracked,
   // so scheduled events keep the same width as you page through the weeks.
   const showTrackedLane = isSourceEnabled(preferences, 'timetracker')
-  const layouts = days.map((day) => buildDayLayout(events, day, { now: now.getTime() }))
+  const layouts = days.map((day) =>
+    buildDayLayout(events, day, { now: now.getTime(), timeZone })
+  )
   const rangeContainsToday = days.some((day) => isToday(day))
-  const currentTimeTop = (getCurrentMinutes(now) / 60) * HOUR_HEIGHT
+  const currentTimeTop = (getCurrentMinutes(new TZDate(now.getTime(), timeZone)) / 60) * HOUR_HEIGHT
+
+  // Two is what the gutter can carry before it starts eating the day columns.
+  const secondaryRulerMarks = useMemo(
+    () =>
+      secondaryTimeZones.slice(0, MAX_SECONDARY_ZONES).map((entry) => ({
+        ...entry,
+        marks: buildSecondaryRulerMarks(days[0], timeZone, entry.zone),
+        // One gutter cannot be right for every day of a week that crosses a clock change,
+        // so the column header owns up to it instead of quietly drifting by an hour.
+        offsetsDiffer: getZoneOffsetsDiffer(days, timeZone, entry.zone)
+      })),
+    [days, timeZone, secondaryTimeZones]
+  )
 
   return (
     <section
       className={`calendar-grid${drag ? ' is-dragging' : ''}`}
-      aria-label={formatViewLabel(calendarView, anchorDate)}
+      aria-label={formatViewLabel(calendarView, anchorDate, timeZone)}
     >
       <div className="calendar-grid-viewport" ref={viewportRef}>
-        <div className="calendar-week" style={{ '--calendar-day-count': days.length }}>
+        <div
+          className="calendar-week"
+          style={{
+            '--calendar-day-count': days.length,
+            '--calendar-secondary-zone-count': secondaryRulerMarks.length
+          }}
+        >
           <div className="calendar-week__day-headers">
             <div className="calendar-week__corner">
-              <span className="calendar-week__timezone">{formatTimezoneOffset(now)}</span>
+              <ZoneColumnHeader city={timeZoneCity} isPrimary zone={timeZone} />
+              {secondaryRulerMarks.map((entry) => (
+                <ZoneColumnHeader
+                  city={entry.city}
+                  key={entry.zone}
+                  note={entry.note}
+                  offsetsDiffer={entry.offsetsDiffer}
+                  zone={entry.zone}
+                />
+              ))}
             </div>
             {days.map((day) => {
               const currentDay = isToday(day)
@@ -317,10 +389,36 @@ export function CalendarGrid({
           <div className="calendar-week__time-scroll" ref={timeScrollRef}>
             <div className="calendar-week__time-grid" style={{ height: 24 * HOUR_HEIGHT }}>
               <div className="calendar-week__time-labels">
-                {HOURS.map((hour) => (
-                  <span key={hour} style={{ top: hour * HOUR_HEIGHT }}>
-                    {String(hour).padStart(2, '0')}:00
-                  </span>
+                <div className="calendar-week__time-column is-primary">
+                  {HOURS.map((hour) => (
+                    <span
+                      className="calendar-week__time-label"
+                      key={hour}
+                      style={{ top: hour * HOUR_HEIGHT }}
+                    >
+                      {String(hour).padStart(2, '0')}:00
+                    </span>
+                  ))}
+                </div>
+                {secondaryRulerMarks.map((entry) => (
+                  <div className="calendar-week__time-column" key={entry.zone}>
+                    {entry.marks.map((mark) => (
+                      <span
+                        className={`calendar-week__time-label${
+                          mark.label === '00:00' ? ' is-midnight' : ''
+                        }`}
+                        key={mark.minute}
+                        style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
+                      >
+                        {mark.label}
+                        {mark.dayOffset !== 0 && (
+                          <sup className="calendar-week__day-offset">
+                            {mark.dayOffset > 0 ? `+${mark.dayOffset}` : `\u2212${-mark.dayOffset}`}
+                          </sup>
+                        )}
+                      </span>
+                    ))}
+                  </div>
                 ))}
               </div>
               {layouts.map((layout, dayIndex) => {
@@ -336,7 +434,7 @@ export function CalendarGrid({
                       const event = position.event
                       const dragging = drag?.eventId === event.id
                       const geometry = dragging
-                        ? getPreviewGeometry(drag.times)
+                        ? getPreviewGeometry(drag.times, timeZone)
                         : {
                             top: (position.startMinutes / 60) * HOUR_HEIGHT,
                             height: (position.durationMinutes / 60) * HOUR_HEIGHT
@@ -431,6 +529,20 @@ export function CalendarGrid({
                   </div>
                 )
               })}
+              {/* A whole-hour zone marks the lines the grid already draws, so only the
+                  5:30/5:45 offsets earn a rule of their own. */}
+              {secondaryRulerMarks.map((entry) =>
+                entry.marks
+                  .filter((mark) => mark.isOffGrid)
+                  .map((mark) => (
+                    <div
+                      aria-hidden="true"
+                      className="calendar-week__secondary-ruler"
+                      key={`${entry.zone}-${mark.minute}`}
+                      style={{ top: (mark.minute / 60) * HOUR_HEIGHT }}
+                    />
+                  ))
+              )}
               {rangeContainsToday && (
                 <div
                   className="calendar-week__current-time"

@@ -12,19 +12,19 @@ function formatEventTime(event) {
   return `${format(start, 'HH:mm')} – ${format(end, 'HH:mm')}`
 }
 
-export function AgendaView({ anchorDate, events, onCompleteReminder, onHideEvent, preferences, sessionActions }) {
-  const sections = buildAgendaSections(events, getViewDays('agenda', anchorDate))
+export function AgendaView({ anchorDate, events, onCompleteReminder, onHideEvent, preferences, sessionActions, timeZone }) {
+  const sections = buildAgendaSections(events, getViewDays('agenda', anchorDate, timeZone))
 
   if (sections.length === 0) {
     return (
-      <section className="calendar-agenda" aria-label={formatViewLabel('agenda', anchorDate)}>
-        <p className="calendar-agenda__empty">No events in {formatViewLabel('agenda', anchorDate)}.</p>
+      <section className="calendar-agenda" aria-label={formatViewLabel('agenda', anchorDate, timeZone)}>
+        <p className="calendar-agenda__empty">No events in {formatViewLabel('agenda', anchorDate, timeZone)}.</p>
       </section>
     )
   }
 
   return (
-    <section className="calendar-agenda" aria-label={formatViewLabel('agenda', anchorDate)}>
+    <section className="calendar-agenda" aria-label={formatViewLabel('agenda', anchorDate, timeZone)}>
       {sections.map((section) => (
         <div className="calendar-agenda__section" key={section.day.toISOString()}>
           <div

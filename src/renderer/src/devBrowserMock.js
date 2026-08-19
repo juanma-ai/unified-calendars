@@ -349,7 +349,10 @@ function defaultPreferences() {
     focusedCalendars: [],
     hiddenCalendars: [],
     hiddenEvents: [],
+    secondaryTimeZones: [],
     sourceEnabled: {},
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZoneCity: null,
     timetrackerDataDir: null
   }
 }
@@ -563,6 +566,36 @@ export function createDevBrowserApi() {
 
     setSourceEnabled: async (source, enabled) => {
       preferences.sourceEnabled[source] = enabled
+      return snapshot()
+    },
+
+    // Same shape as `createCalendarPreferencesStore`'s zone setters, so the gutter can be
+    // exercised in the browser without Electron.
+    setTimeZone: async (timeZone, city) => {
+      preferences.timeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (city !== undefined) preferences.timeZoneCity = city || null
+      return snapshot()
+    },
+
+    setTimeZoneCity: async (city) => {
+      preferences.timeZoneCity = city || null
+      return snapshot()
+    },
+
+    setSecondaryTimeZones: async (zones) => {
+      preferences.secondaryTimeZones = (Array.isArray(zones) ? zones : [])
+        .map((zone) =>
+          typeof zone === 'string'
+            ? { zone, city: null, note: '' }
+            : { zone: zone?.zone, city: zone?.city ?? null, note: zone?.note ?? '' }
+        )
+        .filter((entry) => entry.zone)
+      return snapshot()
+    },
+
+    setSecondaryTimeZoneNote: async (zone, note) => {
+      const entry = preferences.secondaryTimeZones.find((item) => item.zone === zone)
+      if (entry) entry.note = note || ''
       return snapshot()
     },
 

@@ -19,8 +19,12 @@ import {
   setCalendarColor,
   setCalendarSidebarVisibility,
   setCalendarVisibility,
+  setSecondaryTimeZones,
+  setSecondaryTimeZoneNote,
   setSourceEnabled,
   setTimetrackerDataDir,
+  setTimeZone,
+  setTimeZoneCity,
   toggleFocusedCalendar
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
@@ -249,6 +253,30 @@ export function registerIpcHandlers({
   })
   ipcMain.handle('preferences:restoreHiddenEvent', (_event, key) => {
     const preferences = restoreHiddenCalendarEvent(key)
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+
+  ipcMain.handle('preferences:setTimeZone', (_event, timeZone, city) => {
+    const preferences = setTimeZone(String(timeZone ?? ''), city)
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+
+  ipcMain.handle('preferences:setTimeZoneCity', (_event, city) => {
+    const preferences = setTimeZoneCity(city)
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+
+  ipcMain.handle('preferences:setSecondaryTimeZones', (_event, zones) => {
+    const preferences = setSecondaryTimeZones(Array.isArray(zones) ? zones : [])
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+
+  ipcMain.handle('preferences:setSecondaryTimeZoneNote', (_event, zone, note) => {
+    const preferences = setSecondaryTimeZoneNote(String(zone ?? ''), note)
     rescheduleEventNotifications(preferences)
     return preferences
   })

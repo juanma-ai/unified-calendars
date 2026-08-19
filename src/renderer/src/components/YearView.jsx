@@ -12,12 +12,12 @@ function leadingBlanks(date) {
   return (date.getDay() + 6) % 7
 }
 
-export function YearView({ anchorDate, events, onOpenDay, preferences }) {
+export function YearView({ anchorDate, events, onOpenDay, preferences, timeZone }) {
   const heatmap = buildYearHeatmap(events, anchorDate)
   const showTracked = isSourceEnabled(preferences, 'timetracker')
 
   return (
-    <section className="calendar-year" aria-label={formatViewLabel('year', anchorDate)}>
+    <section className="calendar-year" aria-label={formatViewLabel('year', anchorDate, timeZone)}>
       <div className="calendar-year__intro">
         <p className="calendar-year__hint">
           Colour shows how full each day is.
