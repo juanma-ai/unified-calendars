@@ -252,6 +252,26 @@ function buildEvents() {
       end: allDayDate(3),
       allDay: true
     }),
+    // A span long enough to cross a week boundary from most starting days, so the
+    // month grid's cut-and-continue bars have something to draw.
+    googleEvent({
+      account: 'work',
+      calendar: 'team',
+      id: 'devcon',
+      title: 'DevCon conference',
+      start: allDayDate(4),
+      end: allDayDate(10),
+      allDay: true
+    }),
+    // Ends after midnight, so the week grid has to clip it into two columns.
+    googleEvent({
+      account: 'personal',
+      calendar: 'primary',
+      id: 'late-show',
+      title: 'Concierto + after',
+      start: at(2, 22),
+      end: at(3, 2)
+    }),
     googleEvent({
       account: 'work',
       calendar: 'primary',

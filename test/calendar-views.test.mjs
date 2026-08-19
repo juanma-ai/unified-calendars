@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { addDays, startOfDay } from 'date-fns'
+
 import {
   AGENDA_DAYS,
   buildAgendaSections,
-  buildMonthCells,
+  buildDaySegments,
+  buildMonthWeeks,
   buildTrackedDayTotals,
   buildYearHeatmap,
+  eventCoversDay,
   formatTrackedRangeLabel,
+  getEventDayRange,
   formatViewLabel,
   getViewDays,
   getViewRange,
@@ -118,21 +123,54 @@ const events = [
   { id: 'd', title: 'Other day', start: '2026-07-31T09:00:00+02:00' }
 ]
 
-test('month cells bucket events by start day, sorted, with an overflow count', () => {
+test('month weeks lane single-day events per day, with a per-day overflow count', () => {
   const days = [new Date(2026, 6, 30), new Date(2026, 6, 31), new Date(2026, 7, 1)]
-  const cells = buildMonthCells(events, days, 2)
+  const [week] = buildMonthWeeks(events, days, 2)
 
-  assert.deepEqual(cells[0].events.map((event) => event.id), ['a', 'b'])
-  assert.equal(cells[0].overflowCount, 1)
-  assert.deepEqual(cells[1].events.map((event) => event.id), ['d'])
-  assert.equal(cells[1].overflowCount, 0)
-  assert.deepEqual(cells[2].events, [])
+  assert.deepEqual(
+    week.segments.map((segment) => [segment.event.id, segment.startIndex, segment.lane]),
+    [['a', 0, 0], ['b', 0, 1], ['d', 1, 0]]
+  )
+  // 'c' is the third event on the 30th, so it falls behind that day's "+1 more" only.
+  assert.deepEqual(week.overflowCounts, [1, 0, 0])
+  assert.equal(week.laneCount, 2)
 })
 
-test('month cells keep every event when no cap is given', () => {
-  const [cell] = buildMonthCells(events, [new Date(2026, 6, 30)])
-  assert.equal(cell.events.length, 3)
-  assert.equal(cell.overflowCount, 0)
+test('month weeks keep every event when no cap is given', () => {
+  const [week] = buildMonthWeeks(events, [new Date(2026, 6, 30)])
+
+  assert.equal(week.segments.length, 3)
+  assert.deepEqual(week.overflowCounts, [0])
+})
+
+test('a multi-day event is one bar spanning its days, cut at the week boundary', () => {
+  const days = dayList(new Date(2026, 7, 17), 14) // Mon 17 – Sun 30
+  const conference = { id: 'conf', start: '2026-08-20', end: '2026-08-26', allDay: true }
+  const [first, second] = buildMonthWeeks([conference], days, 3)
+
+  assert.deepEqual(
+    { ...first.segments[0], event: undefined },
+    { event: undefined, startIndex: 3, endIndex: 6, span: 4, continuesBefore: false, continuesAfter: true, lane: 0 }
+  )
+  assert.deepEqual(
+    { ...second.segments[0], event: undefined },
+    { event: undefined, startIndex: 0, endIndex: 1, span: 2, continuesBefore: true, continuesAfter: false, lane: 0 }
+  )
+})
+
+test('a multi-day event pushed past the cap counts as overflow on every day it covers', () => {
+  const days = dayList(new Date(2026, 7, 17), 7)
+  const fillers = Array.from({ length: 2 }, (_, index) => ({
+    id: `filler-${index}`,
+    start: '2026-08-18',
+    end: '2026-08-21',
+    allDay: true
+  }))
+  const late = { id: 'late', start: '2026-08-18', end: '2026-08-20', allDay: true }
+  const [week] = buildMonthWeeks([...fillers, late], days, 2)
+
+  assert.deepEqual(week.segments.map((segment) => segment.event.id), ['filler-0', 'filler-1'])
+  assert.deepEqual(week.overflowCounts, [0, 1, 1, 0, 0, 0, 0])
 })
 
 test('year heatmap covers 12 months and scales levels to the busiest day', () => {
@@ -235,12 +273,12 @@ const trackedSessions = [
   }
 ]
 
-test('month cells leave tracked sessions to the strip along the bottom of the cell', () => {
+test('month weeks leave tracked sessions to the strip along the bottom of the cell', () => {
   const days = [new Date(2026, 6, 30)]
-  const [cell] = buildMonthCells([...events, ...trackedSessions], days)
+  const [week] = buildMonthWeeks([...events, ...trackedSessions], days)
 
-  assert.deepEqual(cell.events.map((event) => event.id), ['a', 'b', 'c'])
-  assert.equal(cell.overflowCount, 0)
+  assert.deepEqual(week.segments.map((segment) => segment.event.id), ['a', 'b', 'c'])
+  assert.deepEqual(week.overflowCounts, [0])
 })
 
 test('tracked day totals merge a day into one segment per project, longest first', () => {
@@ -359,4 +397,190 @@ test('week range respects the provided time zone and starts on Monday', () => {
 
 test('formatViewLabel uses the provided time zone', () => {
   assert.equal(formatViewLabel('day', timezoneAnchor, 'America/Los_Angeles'), 'Thu, Jul 30, 2026')
+})
+
+// --- Multi-day events ---------------------------------------------------------------
+
+function dayList(start, count, timeZone) {
+  return Array.from({ length: count }, (_, index) => addDays(startOfDay(start), index))
+}
+
+test('a Google all-day event ends the day before its exclusive end date', () => {
+  const event = { start: '2026-08-20', end: '2026-08-21', allDay: true }
+  const { firstDay, lastDay } = getEventDayRange(event, 'Europe/Madrid')
+
+  assert.equal(ymd(firstDay), '2026-08-20')
+  assert.equal(ymd(lastDay), '2026-08-20', 'a one-day all-day event must not bleed into the 21st')
+})
+
+test('a multi-day all-day event covers every day up to the exclusive end', () => {
+  const event = { start: '2026-08-17', end: '2026-08-21', allDay: true }
+  const { firstDay, lastDay } = getEventDayRange(event, 'Europe/Madrid')
+
+  assert.equal(ymd(firstDay), '2026-08-17')
+  assert.equal(ymd(lastDay), '2026-08-20')
+})
+
+test('date-only all-day boundaries do not shift a day in a western zone', () => {
+  // Parsed as instants these are UTC midnight, which reads as the previous evening in
+  // New York. The 20th has to stay the 20th.
+  const event = { start: '2026-08-20', end: '2026-08-21', allDay: true }
+  const { firstDay, lastDay } = getEventDayRange(event, 'America/New_York')
+
+  assert.equal(ymd(firstDay), '2026-08-20')
+  assert.equal(ymd(lastDay), '2026-08-20')
+})
+
+test('an all-day instant with end equal to start covers exactly one day', () => {
+  const iso = new Date(2026, 7, 20).toISOString()
+  const { firstDay, lastDay } = getEventDayRange({ start: iso, end: iso, allDay: true })
+
+  assert.equal(ymd(firstDay), '2026-08-20')
+  assert.equal(ymd(lastDay), '2026-08-20')
+})
+
+test('an event with no end covers only its start day', () => {
+  const { firstDay, lastDay } = getEventDayRange({ start: new Date(2026, 7, 20, 9).toISOString() })
+
+  assert.equal(ymd(firstDay), '2026-08-20')
+  assert.equal(ymd(lastDay), '2026-08-20')
+})
+
+test('a timed event ending at midnight does not reach the next day', () => {
+  const event = {
+    start: new Date(2026, 7, 20, 20, 0).toISOString(),
+    end: new Date(2026, 7, 21, 0, 0).toISOString()
+  }
+  const { firstDay, lastDay } = getEventDayRange(event)
+
+  assert.equal(ymd(lastDay), '2026-08-20')
+})
+
+test('a timed event crossing midnight covers both days', () => {
+  const event = {
+    start: new Date(2026, 7, 20, 22, 0).toISOString(),
+    end: new Date(2026, 7, 21, 2, 0).toISOString()
+  }
+  const { firstDay, lastDay } = getEventDayRange(event)
+
+  assert.equal(ymd(firstDay), '2026-08-20')
+  assert.equal(ymd(lastDay), '2026-08-21')
+})
+
+test('eventCoversDay reports the middle days of a span, not just the first', () => {
+  const event = { start: '2026-08-17', end: '2026-08-21', allDay: true }
+  const days = dayList(new Date(2026, 7, 16), 7)
+
+  assert.deepEqual(
+    days.map((day) => eventCoversDay(event, day)),
+    [false, true, true, true, true, false, false]
+  )
+})
+
+test('day segments span the days an event covers and pack into lanes', () => {
+  const days = dayList(new Date(2026, 7, 17), 7)
+  const conference = { id: 'a', start: '2026-08-17', end: '2026-08-21', allDay: true }
+  const lunch = { id: 'b', start: '2026-08-18', end: '2026-08-19', allDay: true }
+  const { segments, laneCount } = buildDaySegments([lunch, conference], days)
+
+  assert.equal(laneCount, 2)
+  const bySegmentId = new Map(segments.map((segment) => [segment.event.id, segment]))
+
+  // Longest first, so the week-long bar sits above the one-day event it passes over.
+  assert.deepEqual(
+    { ...bySegmentId.get('a'), event: undefined },
+    { event: undefined, startIndex: 0, endIndex: 3, span: 4, continuesBefore: false, continuesAfter: false, lane: 0 }
+  )
+  assert.equal(bySegmentId.get('b').lane, 1)
+  assert.equal(bySegmentId.get('b').span, 1)
+})
+
+test('day segments clip to the window and flag the edges they run past', () => {
+  const days = dayList(new Date(2026, 7, 17), 7) // Mon 17 – Sun 23
+  const event = { id: 'a', start: '2026-08-14', end: '2026-08-26', allDay: true }
+  const { segments } = buildDaySegments([event], days)
+
+  assert.equal(segments.length, 1)
+  assert.deepEqual(
+    { ...segments[0], event: undefined },
+    { event: undefined, startIndex: 0, endIndex: 6, span: 7, continuesBefore: true, continuesAfter: true, lane: 0 }
+  )
+})
+
+test('day segments drop events that miss the window entirely', () => {
+  const days = dayList(new Date(2026, 7, 17), 7)
+  const before = { id: 'a', start: '2026-08-10', end: '2026-08-12', allDay: true }
+  const after = { id: 'b', start: '2026-08-30', end: '2026-08-31', allDay: true }
+
+  assert.deepEqual(buildDaySegments([before, after], days), { segments: [], laneCount: 0 })
+})
+
+test('lanes are reused once a bar has ended', () => {
+  const days = dayList(new Date(2026, 7, 17), 7)
+  const first = { id: 'a', start: '2026-08-17', end: '2026-08-19', allDay: true }
+  const second = { id: 'b', start: '2026-08-20', end: '2026-08-22', allDay: true }
+  const { segments, laneCount } = buildDaySegments([first, second], days)
+
+  assert.equal(laneCount, 1)
+  assert.deepEqual(segments.map((segment) => segment.lane), [0, 0])
+})
+
+test('a span across a DST change keeps its day count', () => {
+  // Clocks go back in Madrid on Sunday 25 October 2026, making that day 25 hours long.
+  const event = { start: '2026-10-24', end: '2026-10-27', allDay: true }
+  const { firstDay, lastDay } = getEventDayRange(event, 'Europe/Madrid')
+
+  assert.equal(ymd(firstDay), '2026-10-24')
+  assert.equal(ymd(lastDay), '2026-10-26')
+})
+
+test('agenda sections list a multi-day event on every day it covers', () => {
+  const days = dayList(new Date(2026, 7, 17), 7)
+  const conference = { id: 'conf', title: 'DevCon', start: '2026-08-18', end: '2026-08-21', allDay: true }
+  const sections = buildAgendaSections([conference], days)
+
+  assert.deepEqual(
+    sections.map((section) => ymd(section.day)),
+    ['2026-08-18', '2026-08-19', '2026-08-20']
+  )
+})
+
+test('agenda puts an all-day event above the day it shares with timed events', () => {
+  const days = dayList(new Date(2026, 7, 18), 1)
+  const sections = buildAgendaSections(
+    [
+      { id: 'standup', start: '2026-08-18T09:00:00+02:00', end: '2026-08-18T09:15:00+02:00' },
+      { id: 'conf', start: '2026-08-18', end: '2026-08-19', allDay: true }
+    ],
+    days
+  )
+
+  assert.deepEqual(sections[0].events.map((event) => event.id), ['conf', 'standup'])
+})
+
+test('year heat counts a multi-day event on every day it covers', () => {
+  const heatmap = buildYearHeatmap(
+    [{ id: 'trip', start: '2026-07-28', end: '2026-08-01', allDay: true }],
+    anchor
+  )
+
+  const july = heatmap.months[6].days
+  assert.deepEqual(
+    july.filter((entry) => entry.count > 0).map((entry) => ymd(entry.day)),
+    ['2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31']
+  )
+  assert.equal(heatmap.maxCount, 1)
+})
+
+test('year heat clips a span that runs out of the year', () => {
+  const heatmap = buildYearHeatmap(
+    [{ id: 'newyear', start: '2026-12-30', end: '2027-01-03', allDay: true }],
+    anchor
+  )
+
+  const december = heatmap.months[11].days
+  assert.deepEqual(
+    december.filter((entry) => entry.count > 0).map((entry) => ymd(entry.day)),
+    ['2026-12-30', '2026-12-31']
+  )
 })

@@ -13,7 +13,7 @@ function leadingBlanks(date) {
 }
 
 export function YearView({ anchorDate, events, onOpenDay, preferences, timeZone }) {
-  const heatmap = buildYearHeatmap(events, anchorDate)
+  const heatmap = buildYearHeatmap(events, anchorDate, timeZone)
   const showTracked = isSourceEnabled(preferences, 'timetracker')
 
   return (

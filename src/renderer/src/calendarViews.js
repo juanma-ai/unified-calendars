@@ -1,4 +1,4 @@
-import { tz } from '@date-fns/tz'
+import { TZDate, tz } from '@date-fns/tz'
 import {
   addDays,
   addMonths,
@@ -168,26 +168,164 @@ function isTrackedEvent(event) {
   return event.source === 'timetracker'
 }
 
-/**
- * Buckets events into the month grid's day cells. Events are keyed by their
- * start day, matching how the week time grid places them, so a multi-day event
- * shows only on the day it begins.
- *
- * Tracked sessions are left out: the cell draws them as the proportional strip
- * along its bottom edge (`buildTrackedDayTotals`), and a busy day of tracking
- * would otherwise push every meeting out of the cell behind a "+5 more".
- */
-export function buildMonthCells(events, days, maxPerDay = Number.POSITIVE_INFINITY) {
-  const sorted = [...events].filter((event) => !isTrackedEvent(event)).sort(byStart)
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
-  return days.map((day) => {
-    const dayEvents = sorted.filter((event) => isSameDay(new Date(event.start), day))
-    return {
-      day,
-      events: dayEvents.slice(0, maxPerDay),
-      overflowCount: Math.max(0, dayEvents.length - maxPerDay)
+function isDateOnly(value) {
+  return typeof value === 'string' && DATE_ONLY.test(value)
+}
+
+/**
+ * A boundary as the start of the day it falls on, in the calendar's zone.
+ *
+ * Date-only all-day boundaries are floating calendar dates rather than instants:
+ * `2026-08-20` means the 20th wherever you are. Parsing one as an instant puts it at
+ * UTC midnight, and reading that back in a western zone lands on the 19th, so those are
+ * built from the digits instead of routed through `Date`.
+ */
+function toZonedDay(value, timeZone) {
+  if (isDateOnly(value)) {
+    const [year, month, day] = value.split('-').map(Number)
+    return startOfDay(new TZDate(year, month - 1, day, resolveTimeZone(timeZone)))
+  }
+  return startOfDay(new Date(value), withTimeZone(timeZone))
+}
+
+function dayKeyInZone(date, timeZone) {
+  return format(date, 'yyyy-MM-dd', withTimeZone(timeZone))
+}
+
+/**
+ * The first and last day an event actually occupies. This is the single place the app
+ * decides what "spans several days" means, because both ends are off-by-one traps:
+ *
+ * - An all-day `end` is exclusive. Google sends a single all-day event on the 20th as
+ *   `end: 2026-08-21`, so the last day it occupies is the one before that. Sources that
+ *   emit all-day instants with `end === start` (Linear, Wallos, Reminders) fall out of
+ *   the same rule through the clamp at the bottom.
+ * - A timed event ending on the stroke of midnight does not reach into the next day.
+ *   20:00 to 00:00 is one evening, not two days.
+ */
+export function getEventDayRange(event, timeZone) {
+  const firstDay = toZonedDay(event.start, timeZone)
+  if (event.end == null) return { firstDay, lastDay: firstDay }
+
+  const endDay = toZonedDay(event.end, timeZone)
+  const endsOnBoundary =
+    isDateOnly(event.end) || new Date(event.end).getTime() === endDay.getTime()
+  const lastDay = endsOnBoundary ? addDays(endDay, -1, withTimeZone(timeZone)) : endDay
+
+  return { firstDay, lastDay: lastDay < firstDay ? firstDay : lastDay }
+}
+
+/**
+ * Whether `day` is one of the days the event occupies. Replaces the
+ * `isSameDay(event.start, day)` that every view used to bucket with, which showed a
+ * multi-day event only on the day it began.
+ */
+export function eventCoversDay(event, day, timeZone) {
+  const { firstDay, lastDay } = getEventDayRange(event, timeZone)
+  const key = dayKeyInZone(day, timeZone)
+  return key >= dayKeyInZone(firstDay, timeZone) && key <= dayKeyInZone(lastDay, timeZone)
+}
+
+/**
+ * Packs events into horizontal bars across a window of consecutive days — the shared
+ * geometry behind the month grid's spanning bars and the week grid's all-day row.
+ *
+ * Each segment names the columns it covers within *this* window, so an event that
+ * started before it or runs past it is clipped and flagged (`continuesBefore` /
+ * `continuesAfter`) rather than dropped. Lanes are the same greedy interval packing
+ * `assignOverlapColumns` does for the time grid, only measured in days: longest bars
+ * first so a week-long event sits above the one-day events it passes over.
+ *
+ * Callers decide what goes in — the month grid leaves tracked sessions out, the all-day
+ * row takes only all-day events.
+ */
+export function buildDaySegments(events, days, timeZone) {
+  if (days.length === 0) return { segments: [], laneCount: 0 }
+
+  const lastIndex = days.length - 1
+  const firstKey = dayKeyInZone(days[0], timeZone)
+  const lastKey = dayKeyInZone(days[lastIndex], timeZone)
+  const indexByKey = new Map(days.map((day, index) => [dayKeyInZone(day, timeZone), index]))
+
+  const segments = []
+  for (const event of events) {
+    const { firstDay, lastDay } = getEventDayRange(event, timeZone)
+    const startKey = dayKeyInZone(firstDay, timeZone)
+    const endKey = dayKeyInZone(lastDay, timeZone)
+    if (endKey < firstKey || startKey > lastKey) continue
+
+    const startIndex = startKey < firstKey ? 0 : indexByKey.get(startKey)
+    const endIndex = endKey > lastKey ? lastIndex : indexByKey.get(endKey)
+
+    segments.push({
+      event,
+      startIndex,
+      endIndex,
+      span: endIndex - startIndex + 1,
+      continuesBefore: startKey < firstKey,
+      continuesAfter: endKey > lastKey,
+      lane: 0
+    })
+  }
+
+  segments.sort(
+    (a, b) => a.startIndex - b.startIndex || b.span - a.span || byStart(a.event, b.event)
+  )
+
+  const laneEnds = []
+  for (const segment of segments) {
+    let lane = laneEnds.findIndex((end) => end < segment.startIndex)
+    if (lane === -1) lane = laneEnds.length
+    laneEnds[lane] = segment.endIndex
+    segment.lane = lane
+  }
+
+  return { segments, laneCount: laneEnds.length }
+}
+
+export const DAYS_PER_WEEK = 7
+
+/**
+ * The month grid, one entry per week row. Lanes are packed per row rather than across
+ * the whole month so a bar can be drawn as a single element spanning its columns; an
+ * event crossing a Sunday is cut at the row edge and picked up by the next row, with
+ * `continuesBefore` / `continuesAfter` telling the row which ends to leave open.
+ *
+ * `maxLanes` caps the row's height. Events pushed past it are not dropped silently:
+ * each day counts the ones covering it that did not fit, which is what the cell's
+ * "+N more" reports.
+ *
+ * Tracked sessions are left out: the cell draws them as the proportional strip along
+ * its bottom edge (`buildTrackedDayTotals`), and a busy day of tracking would otherwise
+ * push every meeting out of the row behind a "+5 more".
+ */
+export function buildMonthWeeks(events, days, maxLanes = Number.POSITIVE_INFINITY, timeZone) {
+  const scheduled = [...events].filter((event) => !isTrackedEvent(event)).sort(byStart)
+  const weeks = []
+
+  for (let offset = 0; offset < days.length; offset += DAYS_PER_WEEK) {
+    const weekDays = days.slice(offset, offset + DAYS_PER_WEEK)
+    const { segments, laneCount } = buildDaySegments(scheduled, weekDays, timeZone)
+    const overflowCounts = weekDays.map(() => 0)
+
+    for (const segment of segments) {
+      if (segment.lane < maxLanes) continue
+      for (let index = segment.startIndex; index <= segment.endIndex; index += 1) {
+        overflowCounts[index] += 1
+      }
     }
-  })
+
+    weeks.push({
+      days: weekDays,
+      segments: segments.filter((segment) => segment.lane < maxLanes),
+      overflowCounts,
+      laneCount: Math.min(laneCount, maxLanes)
+    })
+  }
+
+  return weeks
 }
 
 // Ten hours of tracked work fills a month cell's strip. A fixed reference keeps the
@@ -243,17 +381,17 @@ function dayKey(date) {
  * same signal counted twice, which is what letting sessions inflate the count would do:
  * three sessions of one project would read busier than three meetings.
  */
-export function buildYearHeatmap(events, anchor) {
+export function buildYearHeatmap(events, anchor, timeZone) {
   const counts = new Map()
   const projects = new Map()
   const year = anchor.getFullYear()
 
   for (const event of events) {
     const start = new Date(event.start)
-    if (start.getFullYear() !== year) continue
-    const key = dayKey(start)
 
     if (isTrackedEvent(event)) {
+      if (start.getFullYear() !== year) continue
+      const key = dayKey(start)
       const worked = projects.get(key) ?? new Map()
       if (!worked.has(event.calendarId)) {
         worked.set(event.calendarId, {
@@ -266,7 +404,14 @@ export function buildYearHeatmap(events, anchor) {
       continue
     }
 
-    counts.set(key, (counts.get(key) ?? 0) + 1)
+    // A week away is a week of busy days, not one busy day followed by six free ones,
+    // so a scheduled event counts once on every day it covers, clipped to this year.
+    const { firstDay, lastDay } = getEventDayRange(event, timeZone)
+    for (let day = firstDay; day <= lastDay; day = addDays(day, 1, withTimeZone(timeZone))) {
+      if (day.getFullYear() !== year) continue
+      const key = dayKey(day)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
   }
 
   const maxCount = Math.max(0, ...counts.values())
@@ -307,13 +452,17 @@ function isAgendaEvent(event) {
   return event.source !== 'timetracker'
 }
 
-export function buildAgendaSections(events, days) {
-  const sorted = events.filter(isAgendaEvent).sort(byStart)
+export function buildAgendaSections(events, days, timeZone) {
+  const sorted = events
+    .filter(isAgendaEvent)
+    // An all-day event has no clock time to sort by, so it heads its day rather than
+    // landing among the morning meetings at whatever midnight its source used.
+    .sort((a, b) => Number(Boolean(b.allDay)) - Number(Boolean(a.allDay)) || byStart(a, b))
 
   return days
     .map((day) => ({
       day,
-      events: sorted.filter((event) => isSameDay(new Date(event.start), day))
+      events: sorted.filter((event) => eventCoversDay(event, day, timeZone))
     }))
     .filter((section) => section.events.length > 0)
 }

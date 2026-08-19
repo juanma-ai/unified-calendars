@@ -566,15 +566,24 @@ input {
   color: var(--accent);
 }
 
+/* The row is as tall as it needs lanes: a multi-day event is one bar spanning its
+   columns, so bars stack in rows rather than piling up inside a single day's cell. */
 .calendar-week__all-day {
+  position: relative;
+  align-content: start;
+  gap: 4px 0;
+  grid-template-rows: repeat(var(--calendar-all-day-lanes, 1), auto);
   min-height: 48px;
+  padding: 5px 0;
   border-bottom: 1px solid var(--border);
 }
 
 .calendar-week__all-day-label {
+  z-index: 1;
   display: flex;
+  grid-row: 1 / -1;
   align-items: flex-start;
-  padding: 8px 12px;
+  padding: 3px 12px;
   color: var(--muted);
   border-right: 1px solid var(--border);
   font-size: 10px;
@@ -583,17 +592,54 @@ input {
   text-transform: uppercase;
 }
 
+/* Column dividers and the today tint only. The bars sit above these in the same grid,
+   so a cell must not carry padding of its own or the bars would not line up with it. */
 .calendar-week__all-day-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  grid-row: 1 / -1;
   min-width: 0;
-  padding: 5px 6px;
+  margin: -5px 0;
   border-right: 1px solid var(--border);
 }
 
 .calendar-week__all-day-cell.is-today {
   background: var(--accent-soft);
+}
+
+.calendar-week__all-day-event {
+  z-index: 1;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+/* A block cut off runs flush to the edge that cut it and squares off there, so it reads
+   as continuing rather than as an event that ends at that line. An all-day bar is cut
+   sideways by the edge of the week; a timed block is cut top or bottom by midnight. */
+.calendar-week__all-day-event.continues-before {
+  padding-left: 0;
+}
+
+.calendar-week__all-day-event.continues-after {
+  padding-right: 0;
+}
+
+.calendar-week__all-day-event.continues-before .components-button.event-pill {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.calendar-week__all-day-event.continues-after .components-button.event-pill {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.calendar-week__timed-event.continues-before .components-button.event-pill {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.calendar-week__timed-event.continues-after .components-button.event-pill {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .calendar-week__time-scroll {
@@ -754,15 +800,36 @@ input {
 .calendar-month__grid {
   display: grid;
   grid-auto-rows: minmax(96px, 1fr);
-  grid-template-columns: repeat(7, minmax(0, 1fr));
   min-height: 0;
   overflow-y: auto;
+}
+
+/* One row per calendar week. A multi-day event is a single bar spanning its columns,
+   so it cannot live inside a day cell; the cells become a backdrop layer and the bars
+   sit in the row's own grid on top of them. */
+.calendar-month__week {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 2px 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: auto repeat(var(--calendar-month-lanes, 0), auto) auto;
+  min-width: 0;
+  padding-bottom: 6px;
+}
+
+.calendar-month__week-backdrop {
+  position: absolute;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  inset: 0;
 }
 
 .calendar-month__cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: flex-end;
   min-width: 0;
   padding: 6px;
   border-right: 1px solid var(--border);
@@ -778,17 +845,19 @@ input {
 }
 
 .calendar-month__day-number {
-  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  padding: 6px 6px 2px;
   font-size: 13px;
   font-weight: 500;
   line-height: 1;
 }
 
-.calendar-month__cell.is-outside-month .calendar-month__day-number {
+.calendar-month__day-number.is-outside-month {
   color: var(--muted);
 }
 
-.calendar-month__cell.is-today .calendar-month__day-number span {
+.calendar-month__day-number span[aria-current='date'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -800,18 +869,50 @@ input {
   color: #fff;
 }
 
-.calendar-month__events {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 0;
-  overflow: hidden;
+/* A bar for one event, spanning the columns it covers. `min-width: 0` on the segment
+   and the pill inside it is what lets a long title ellipsis instead of forcing the
+   whole row wider than its seven columns. */
+.calendar-month__segment {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 0 3px;
 }
 
-/* Month cells are short, so their pills stay on one line: time first, then the
+/* A bar cut by the edge of the week runs flush to it and squares off on that side, so
+   the eye reads it as continuing rather than as two separate events. */
+.calendar-month__segment.continues-before {
+  padding-left: 0;
+}
+
+.calendar-month__segment.continues-after {
+  padding-right: 0;
+}
+
+.calendar-month__segment.continues-before .components-button.event-pill {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.calendar-month__segment.continues-after .components-button.event-pill {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* `Dropdown` wraps the pill in an inline-block div of its own, which sizes to its
+   content. The pill's `width: 100%` is then 100% of a shrink-wrapped box, so a bar
+   spanning five columns still drew as a one-word pill in the first of them. The old
+   layout got away with it because the cell was a flex column and stretched the wrapper
+   on the cross axis; a bar in a grid row has to say so. */
+.calendar-month__segment > .components-dropdown,
+.calendar-week__all-day-event > .components-dropdown {
+  display: block;
+}
+
+/* Month rows are short, so their pills stay on one line: time first, then the
    title truncated, instead of the stacked layout the week grid uses. */
-.calendar-month__events .components-button.event-pill {
+.calendar-month__segment .components-button.event-pill,
+.calendar-week__all-day-event .components-button.event-pill {
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -821,7 +922,18 @@ input {
   white-space: nowrap;
 }
 
-.calendar-month__events .event-pill__title {
+/* The chevron marking a bar that runs past the edge it is cut at. It keeps its width
+   while the title ellipsises, so the "there is more of this" signal never disappears
+   into the truncation. */
+.event-pill__continues {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.calendar-month__segment .event-pill__title,
+.calendar-week__all-day-event .event-pill__title {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -829,8 +941,11 @@ input {
 }
 
 .components-button.calendar-month__more {
+  position: relative;
+  z-index: 1;
+  justify-content: flex-start;
   height: auto;
-  padding: 0 4px;
+  padding: 0 7px;
   color: var(--muted);
   font-size: 12px;
 }

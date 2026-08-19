@@ -24,7 +24,7 @@ function trackedSession(overrides) {
   }
 }
 
-test('separates all-day events and positions timed events by minute', () => {
+test('leaves all-day events out and positions timed events by minute', () => {
   const layout = buildDayLayout(
     [
       { id: 'all-day', allDay: true, start: '2026-07-20', end: '2026-07-21' },
@@ -50,7 +50,9 @@ test('separates all-day events and positions timed events by minute', () => {
     day
   )
 
-  assert.deepEqual(layout.allDayEvents.map((event) => event.id), ['all-day'])
+  // All-day events span columns, so the grid builds that row for the whole week.
+  assert.equal(layout.allDayEvents, undefined)
+  assert.equal(layout.timedEvents.length, 3)
   assert.equal(layout.timedEvents[0].startMinutes, 540)
   assert.equal(layout.timedEvents[0].durationMinutes, 60)
   assert.equal(layout.timedEvents[1].durationMinutes, 5)
@@ -293,4 +295,57 @@ test('splits the lane side by side if the database somehow holds overlapping ses
       { column: 1, columnCount: 2 }
     ]
   )
+})
+
+test('a timed event crossing midnight is drawn, clipped, in both columns', () => {
+  const overnight = {
+    id: 'overnight',
+    allDay: false,
+    start: '2026-07-20T22:00:00+02:00',
+    end: '2026-07-21T02:00:00+02:00'
+  }
+
+  const [first] = buildDayLayout([overnight], day, { timeZone: 'Europe/Madrid' }).timedEvents
+  assert.equal(first.startMinutes, 22 * 60)
+  assert.equal(first.durationMinutes, 120, 'clipped at midnight')
+  assert.equal(first.continuesBefore, false)
+  assert.equal(first.continuesAfter, true)
+
+  const nextDay = new Date('2026-07-21T12:00:00+02:00')
+  const [second] = buildDayLayout([overnight], nextDay, { timeZone: 'Europe/Madrid' }).timedEvents
+  assert.equal(second.startMinutes, 0)
+  assert.equal(second.durationMinutes, 120)
+  assert.equal(second.continuesBefore, true)
+  assert.equal(second.continuesAfter, false)
+})
+
+test('a timed event ending at midnight stays out of the next day', () => {
+  const evening = {
+    id: 'evening',
+    allDay: false,
+    start: '2026-07-20T20:00:00+02:00',
+    end: '2026-07-21T00:00:00+02:00'
+  }
+  const nextDay = new Date('2026-07-21T12:00:00+02:00')
+
+  assert.equal(buildDayLayout([evening], day, { timeZone: 'Europe/Madrid' }).timedEvents.length, 1)
+  assert.deepEqual(buildDayLayout([evening], nextDay, { timeZone: 'Europe/Madrid' }).timedEvents, [])
+})
+
+test('a single-day event is not flagged as continuing at either end', () => {
+  const [position] = buildDayLayout(
+    [
+      {
+        id: 'meeting',
+        allDay: false,
+        start: '2026-07-20T09:00:00+02:00',
+        end: '2026-07-20T10:00:00+02:00'
+      }
+    ],
+    day,
+    { timeZone: 'Europe/Madrid' }
+  ).timedEvents
+
+  assert.equal(position.continuesBefore, false)
+  assert.equal(position.continuesAfter, false)
 })

@@ -2,6 +2,7 @@ import { Button, Dropdown, MenuGroup, MenuItem } from '@wordpress/components'
 import { external } from '@wordpress/icons'
 import { format } from 'date-fns'
 import { getEventColor } from '../calendarViewModel.js'
+import { getEventDayRange } from '../calendarViews.js'
 import { getEventPalette } from '../eventColors.js'
 import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
 
@@ -50,11 +51,25 @@ function lightenHexColor(color, amount = 0.6) {
 }
 
 /**
+ * `Aug 17 - Aug 20` for an event covering more than one day, and nothing at all for the
+ * ordinary single-day case. A bar can be cut by the edge of a week or of the visible
+ * range, so its own width never tells the whole story; this is the only place the full
+ * span is spelled out, and it rides in the pill's accessible name.
+ */
+function getDayRangeLabel(event) {
+  const { firstDay, lastDay } = getEventDayRange(event)
+  if (firstDay.getTime() === lastDay.getTime()) return null
+  return `${format(firstDay, 'MMM d')} - ${format(lastDay, 'MMM d')}`
+}
+
+/**
  * `variant` picks how the event reads in the surrounding layout: `pill` is the
  * coloured block used in the grids, `row` is the flat list line used by the
  * agenda, where the colour moves into a swatch so the title stays plain text.
  */
 export function EventPill({
+  continuesAfter = false,
+  continuesBefore = false,
   event,
   onCompleteReminder,
   onHideEvent,
@@ -69,8 +84,14 @@ export function EventPill({
   const palette = getEventPalette(displayColor)
   const isRow = variant === 'row'
   // An all-day event has no meaningful clock time — showing one would print the
-  // midnight boundary the source happened to use.
-  const time = showTime && !event.allDay ? format(new Date(event.start), 'HH:mm') : null
+  // midnight boundary the source happened to use. Neither does a day the event was
+  // already running on: its start time belongs to the day it began, and repeating it
+  // here would claim the event starts again every morning.
+  const time =
+    showTime && !event.allDay && !continuesBefore
+      ? format(new Date(event.start), 'HH:mm')
+      : null
+  const dayRangeLabel = getDayRangeLabel(event)
   const trelloAssigneeLabel = getTrelloAssigneeLabel(event)
   const trelloDueLabel = event.source === 'trello' ? format(new Date(event.start), 'MMM d, HH:mm') : null
   const trelloMetaLabel = trelloAssigneeLabel
@@ -79,6 +100,7 @@ export function EventPill({
   const isTracked = event.source === 'timetracker'
   const actionLabel = [
     event.title,
+    dayRangeLabel,
     trelloAssigneeLabel ? `Assigned: ${trelloAssigneeLabel}` : null,
     trelloDueLabel ? `Due: ${trelloDueLabel}` : null,
     isTracked ? 'Open tracked session details' : 'Open event actions'
@@ -104,8 +126,10 @@ export function EventPill({
               aria-hidden="true"
             />
           )}
+          {continuesBefore && <span className="event-pill__continues" aria-hidden="true">◀</span>}
           {time && !isRow && <span className="event-pill__time">{time}</span>}
           <span className="event-pill__title">{event.title}</span>
+          {continuesAfter && <span className="event-pill__continues" aria-hidden="true">▶</span>}
           {trelloMetaLabel && <span className="event-pill__meta">{trelloMetaLabel}</span>}
         </Button>
       )}
