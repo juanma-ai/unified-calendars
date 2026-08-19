@@ -8,7 +8,7 @@ import {
   MenuItem,
   SearchControl
 } from '@wordpress/components'
-import { external, moreVertical } from '@wordpress/icons'
+import { check, external, moreVertical } from '@wordpress/icons'
 
 import { getCalendarLink } from '../calendarLinks.js'
 import { formatTrackedRangeLabel } from '../calendarViews.js'
@@ -43,15 +43,15 @@ function getStatusText(status) {
   return `${sourceLabel}: ${status.lastError ?? 'error'}`
 }
 
-function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }) {
+function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange, onFocusedToggle }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const link = getCalendarLink(calendar)
 
   return (
     <div
       className={`calendar-sidebar__calendar${calendar.visible ? '' : ' is-hidden'}${
-        isMenuOpen ? ' is-menu-open' : ''
-      }`}
+        calendar.focused ? ' is-focused' : ''
+      }${isMenuOpen ? ' is-menu-open' : ''}`}
     >
       <Button
         className="calendar-sidebar__calendar-toggle"
@@ -84,8 +84,17 @@ function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }
         >
           {({ onClose }) => (
             <>
-              {link && (
-                <MenuGroup>
+              <MenuGroup>
+                <MenuItem
+                  icon={calendar.focused ? check : null}
+                  onClick={() => {
+                    onFocusedToggle(calendar.id)
+                    onClose()
+                  }}
+                >
+                  Display only this calendar
+                </MenuItem>
+                {link && (
                   <MenuItem
                     icon={external}
                     onClick={() => {
@@ -95,8 +104,8 @@ function CalendarRow({ calendar, countLabel, onColorChange, onVisibilityChange }
                   >
                     {link.label}
                   </MenuItem>
-                </MenuGroup>
-              )}
+                )}
+              </MenuGroup>
               <MenuGroup label="Color">
                 <div className="calendar-color-popover">
                   <ColorPicker
@@ -164,6 +173,7 @@ export function CalendarSidebar({
   hiddenEventCount,
   now,
   onColorChange,
+  onFocusedToggle,
   onOpenSettings,
   onSourceEnabledChange,
   onVisibilityChange,
@@ -254,6 +264,7 @@ export function CalendarSidebar({
                       }
                       key={calendar.id}
                       onColorChange={onColorChange}
+                      onFocusedToggle={onFocusedToggle}
                       onVisibilityChange={onVisibilityChange}
                     />
                   ))

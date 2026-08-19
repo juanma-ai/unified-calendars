@@ -5,6 +5,7 @@ const DEFAULT_PREFERENCES = {
   calendarColors: {},
   calendarSidebarVisibility: {},
   calendarVisibility: {},
+  focusedCalendars: [],
   hiddenCalendars: [],
   hiddenEvents: [],
   sourceEnabled: {},
@@ -16,6 +17,7 @@ function normalize(value = {}) {
     calendarColors: value.calendarColors ?? {},
     calendarSidebarVisibility: value.calendarSidebarVisibility ?? {},
     calendarVisibility: value.calendarVisibility ?? {},
+    focusedCalendars: value.focusedCalendars ?? [],
     hiddenCalendars: value.hiddenCalendars ?? [],
     hiddenEvents: value.hiddenEvents ?? [],
     // Whole-source master switch, distinct from per-calendar visibility: turning a
@@ -59,6 +61,18 @@ export function createCalendarPreferencesStore(storage) {
       return get()
     },
 
+    toggleFocusedCalendar(calendarId) {
+      const preferences = get()
+      const index = preferences.focusedCalendars.indexOf(calendarId)
+      if (index === -1) {
+        preferences.focusedCalendars.push(calendarId)
+      } else {
+        preferences.focusedCalendars.splice(index, 1)
+      }
+      save(preferences)
+      return get()
+    },
+
     /**
      * Move every preference keyed by a calendar id when that id changes. Renaming a
      * tracker project changes its calendarId, and without this the project silently loses
@@ -81,6 +95,9 @@ export function createCalendarPreferencesStore(storage) {
       }
 
       preferences.hiddenCalendars = preferences.hiddenCalendars.map((id) =>
+        id === oldId ? newId : id
+      )
+      preferences.focusedCalendars = preferences.focusedCalendars.map((id) =>
         id === oldId ? newId : id
       )
 
@@ -146,6 +163,8 @@ export const setCalendarSidebarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarSidebarVisibility(calendarId, visible)
 export const setCalendarVisibility = (calendarId, visible) =>
   getDefaultStore().setCalendarVisibility(calendarId, visible)
+export const toggleFocusedCalendar = (calendarId) =>
+  getDefaultStore().toggleFocusedCalendar(calendarId)
 export const renameCalendarPreferences = (oldId, newId) =>
   getDefaultStore().renameCalendar(oldId, newId)
 export const setSourceEnabled = (source, enabled) =>

@@ -282,6 +282,15 @@ input {
   color: #9b9b9b;
 }
 
+.calendar-sidebar__calendar.is-focused {
+  background: rgb(0 0 0 / 4%);
+  border-radius: 4px;
+}
+
+.calendar-sidebar__calendar.is-focused .calendar-sidebar__calendar-name {
+  font-weight: 600;
+}
+
 .calendar-sidebar__calendar-menu {
   flex: 0 0 auto;
   opacity: 0;

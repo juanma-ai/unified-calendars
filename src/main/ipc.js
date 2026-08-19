@@ -20,7 +20,8 @@ import {
   setCalendarSidebarVisibility,
   setCalendarVisibility,
   setSourceEnabled,
-  setTimetrackerDataDir
+  setTimetrackerDataDir,
+  toggleFocusedCalendar
 } from './calendarPreferences.js'
 import { createEventNotificationScheduler } from './eventNotifications.js'
 import { createEventTimeUpdater } from './eventMutations.js'
@@ -228,6 +229,11 @@ export function registerIpcHandlers({
   })
   ipcMain.handle('preferences:setCalendarVisibility', (_event, calendarId, visible) => {
     const preferences = setCalendarVisibility(calendarId, Boolean(visible))
+    rescheduleEventNotifications(preferences)
+    return preferences
+  })
+  ipcMain.handle('preferences:toggleFocusedCalendar', (_event, calendarId) => {
+    const preferences = toggleFocusedCalendar(calendarId)
     rescheduleEventNotifications(preferences)
     return preferences
   })

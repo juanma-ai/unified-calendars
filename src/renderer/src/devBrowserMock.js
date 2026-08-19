@@ -346,6 +346,7 @@ function defaultPreferences() {
     calendarColors: {},
     calendarSidebarVisibility: {},
     calendarVisibility: {},
+    focusedCalendars: [],
     hiddenCalendars: [],
     hiddenEvents: [],
     sourceEnabled: {},
@@ -547,6 +548,16 @@ export function createDevBrowserApi() {
         preferences.calendarSidebarVisibility[calendarId] = true
       }
       preferences.calendarVisibility[calendarId] = visible
+      return snapshot()
+    },
+
+    toggleFocusedCalendar: async (calendarId) => {
+      const index = preferences.focusedCalendars.indexOf(calendarId)
+      if (index === -1) {
+        preferences.focusedCalendars.push(calendarId)
+      } else {
+        preferences.focusedCalendars.splice(index, 1)
+      }
       return snapshot()
     },
 

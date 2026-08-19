@@ -5,6 +5,7 @@ function normalizedPreferences(preferences = {}) {
     calendarColors: preferences.calendarColors ?? {},
     calendarSidebarVisibility: preferences.calendarSidebarVisibility ?? {},
     calendarVisibility: preferences.calendarVisibility ?? {},
+    focusedCalendars: preferences.focusedCalendars ?? [],
     hiddenCalendars: preferences.hiddenCalendars ?? [],
     hiddenEvents: preferences.hiddenEvents ?? [],
     sourceEnabled: preferences.sourceEnabled ?? {}
@@ -43,6 +44,7 @@ function isCalendarInSidebar(event, preferences) {
 
 export function buildCalendars(events, preferenceValue, availableCalendars = []) {
   const preferences = normalizedPreferences(preferenceValue)
+  const focusedSet = new Set(preferences.focusedCalendars)
   const calendars = new Map()
 
   for (const calendar of availableCalendars) {
@@ -58,7 +60,8 @@ export function buildCalendars(events, preferenceValue, availableCalendars = [])
       color: preferences.calendarColors[calendar.calendarId] ?? calendar.calendarDefaultColor,
       count: 0,
       sidebarVisible: isCalendarInSidebar(calendar, preferences),
-      visible: isCalendarVisible(calendar, preferences)
+      visible: isCalendarVisible(calendar, preferences),
+      focused: focusedSet.has(calendar.calendarId)
     })
   }
 
@@ -80,7 +83,8 @@ export function buildCalendars(events, preferenceValue, availableCalendars = [])
       color: preferences.calendarColors[event.calendarId] ?? event.calendarDefaultColor,
       count: 1,
       sidebarVisible: isCalendarInSidebar(event, preferences),
-      visible: isCalendarVisible(event, preferences)
+      visible: isCalendarVisible(event, preferences),
+      focused: focusedSet.has(event.calendarId)
     })
   }
 
@@ -94,11 +98,14 @@ export function filterVisibleEvents(events, preferenceValue, searchQuery = '') {
   const preferences = normalizedPreferences(preferenceValue)
   const hiddenEvents = new Set(preferences.hiddenEvents.map((item) => item.key))
   const query = searchQuery.trim().toLocaleLowerCase()
+  const hasFocused = preferences.focusedCalendars.length > 0
+  const focusedSet = hasFocused ? new Set(preferences.focusedCalendars) : null
 
   return events.filter((event) => {
     if (!isSourceEnabled(preferences, event.source)) return false
     if (!isCalendarInSidebar(event, preferences)) return false
-    if (!isCalendarVisible(event, preferences)) return false
+    if (hasFocused && !focusedSet.has(event.calendarId)) return false
+    if (!hasFocused && !isCalendarVisible(event, preferences)) return false
     if (hiddenEvents.has(`occurrence:${event.id}`)) return false
     if (event.seriesId && hiddenEvents.has(`series:${event.seriesId}`)) return false
     return !query || event.title.toLocaleLowerCase().includes(query)
