@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- White body with rounded corners and dark navy border -->
+  <rect x="28" y="56" width="456" height="432" rx="44" ry="44" fill="#ffffff" stroke="#1e2a4a" stroke-width="14"/>
+
+  <!-- Blue header bar -->
+  <path d="M28 100 C28 77.9 45.9 60 68 60 L444 60 C466.1 60 484 77.9 484 100 L484 164 L28 164 Z" fill="#4285f4"/>
+  <!-- Header bottom border -->
+  <line x1="28" y1="164" x2="484" y2="164" stroke="#1e2a4a" stroke-width="10"/>
+
+  <!-- Left binder ring -->
+  <rect x="140" y="20" width="22" height="70" rx="11" ry="11" fill="#a0aec0" stroke="#1e2a4a" stroke-width="7"/>
+  <rect x="145" y="26" width="12" height="58" rx="6" ry="6" fill="#e2e8f0"/>
+
+  <!-- Right binder ring -->
+  <rect x="350" y="20" width="22" height="70" rx="11" ry="11" fill="#a0aec0" stroke="#1e2a4a" stroke-width="7"/>
+  <rect x="355" y="26" width="12" height="58" rx="6" ry="6" fill="#e2e8f0"/>
+
+  <!-- Grid 4 columns x 4 rows -->
+  <!-- Row 1: all light gray -->
+  <rect x="84" y="196" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="164" y="196" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="244" y="196" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="324" y="196" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+
+  <!-- Row 2: purple, blue, light gray, green (tall, spans 2 rows) -->
+  <rect x="84" y="272" width="60" height="56" rx="8" ry="8" fill="#a78bfa"/>
+  <rect x="164" y="272" width="60" height="56" rx="8" ry="8" fill="#4285f4"/>
+  <rect x="244" y="272" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="324" y="272" width="60" height="132" rx="8" ry="8" fill="#34d399"/>
+
+  <!-- Row 3: purple, light gray, orange -->
+  <rect x="84" y="348" width="60" height="56" rx="8" ry="8" fill="#a78bfa"/>
+  <rect x="164" y="348" width="60" height="56" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="244" y="348" width="60" height="56" rx="8" ry="8" fill="#fbbf24"/>
+
+  <!-- Row 4: green, green, light gray, light gray -->
+  <rect x="84" y="424" width="60" height="48" rx="8" ry="8" fill="#34d399"/>
+  <rect x="164" y="424" width="60" height="48" rx="8" ry="8" fill="#34d399"/>
+  <rect x="244" y="424" width="60" height="48" rx="8" ry="8" fill="#e8eaed"/>
+  <rect x="324" y="424" width="60" height="48" rx="8" ry="8" fill="#e8eaed"/>
+</svg>
