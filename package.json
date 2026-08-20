@@ -52,6 +52,7 @@
     ],
     "mac": {
       "target": "dir",
+      "icon": "assets/icon.png",
       "extendInfo": {
         "NSRemindersFullAccessUsageDescription": "Unified Calendar reads your reminders so it can show them alongside your Google Calendar and Trello events.",
         "NSRemindersUsageDescription": "Unified Calendar reads your reminders so it can show them alongside your Google Calendar and Trello events."

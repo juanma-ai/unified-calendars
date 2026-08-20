@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeImage } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getUnifiedEvents, invalidateSourceCache } from './aggregator.js'
@@ -10,6 +10,7 @@ import { createProjectAdmin } from './trackingProjects.js'
 import { renameCalendarPreferences } from './calendarPreferences.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const appIcon = nativeImage.createFromPath(join(__dirname, '../../assets/icon.png'))
 let mainWindow = null
 let noteWindow = null
 let menuBarAgenda = null
@@ -24,6 +25,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: appIcon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
