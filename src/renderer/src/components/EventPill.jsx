@@ -6,6 +6,14 @@ import { getEventDayRange } from '../calendarViews.js'
 import { getEventPalette } from '../eventColors.js'
 import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
 
+/** Label for the popover's open-in-provider item, by event source. */
+const OPEN_IN_LABELS = {
+  google: 'Open in Google Calendar',
+  trello: 'Open in Trello',
+  linear: 'Open in Linear',
+  wallos: 'Open in Wallos'
+}
+
 function getShortAssigneeName(assignee) {
   if (assignee.isMe) return 'You'
   return assignee.name?.split(' ')[0] || assignee.username || assignee.initials || 'Unknown'
@@ -157,11 +165,7 @@ export function EventPill({
                 onClose()
               }}
             >
-              {event.source === 'trello'
-                ? 'Open in Trello'
-                : event.source === 'linear'
-                  ? 'Open in Linear'
-                  : 'Open in Google Calendar'}
+              {OPEN_IN_LABELS[event.source] ?? 'Open link'}
             </MenuItem>
           )}
           {event.source === 'reminders' && onCompleteReminder && (

@@ -129,7 +129,7 @@ export async function fetchWallosEvents(rangeStart, rangeEnd) {
 
       const occurrences = getOccurrencesInRange(sub, rangeStart, rangeEnd)
       for (const date of occurrences) {
-        events.push(mapWallosPayment(sub, date))
+        events.push(mapWallosPayment(sub, date, baseUrl))
       }
     }
 

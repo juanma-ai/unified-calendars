@@ -105,8 +105,11 @@ export function mapLinearIssue(issue) {
  * A Wallos subscription payment. Each occurrence is an all-day event on the
  * payment date. Subscriptions recur based on cycle (1=days, 2=weeks, 3=months,
  * 4=years) and frequency (every N cycles). Each payment method becomes its own calendar.
+ * `url` is the Wallos instance, not the subscription's own vendor site (which stays in
+ * `raw`): Wallos has no per-subscription deep link, so opening the dashboard is the most
+ * specific destination available.
  */
-export function mapWallosPayment(subscription, paymentDate) {
+export function mapWallosPayment(subscription, paymentDate, baseUrl = null) {
   const [y, m, d] = paymentDate.split('-').map(Number)
   const iso = new Date(y, m - 1, d).toISOString()
   const price = Number(subscription.price).toFixed(2)
@@ -126,7 +129,7 @@ export function mapWallosPayment(subscription, paymentDate) {
     start: iso,
     end: iso,
     allDay: true,
-    url: subscription.url || null,
+    url: baseUrl,
     status: 'confirmed',
     raw: subscription
   }

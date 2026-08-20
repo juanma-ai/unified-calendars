@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapGoogleEvent, mapTrackedEntry, mapTrelloCard, mapLinearIssue } from '../src/main/sources/calendarEventMappers.js'
+import {
+  mapGoogleEvent,
+  mapTrackedEntry,
+  mapTrelloCard,
+  mapLinearIssue,
+  mapWallosPayment
+} from '../src/main/sources/calendarEventMappers.js'
 
 test('Google events retain calendar and recurring-series identity', () => {
   const event = mapGoogleEvent(
@@ -161,4 +167,26 @@ test('Linear issue start/end are local midnight of the due date', () => {
   const expected = new Date(2026, 7, 7).toISOString()
   assert.equal(event.start, expected)
   assert.equal(event.end, expected)
+})
+
+const WALLOS_SUBSCRIPTION = {
+  id: 42,
+  name: 'Netflix',
+  price: 12.99,
+  payment_method_id: 3,
+  payment_method_name: 'Visa',
+  url: 'https://www.netflix.com'
+}
+
+test('a Wallos payment opens in Wallos, not on the vendor site', () => {
+  const event = mapWallosPayment(WALLOS_SUBSCRIPTION, '2026-08-07', 'https://wallos.example.com')
+
+  assert.equal(event.url, 'https://wallos.example.com')
+  assert.equal(event.raw.url, 'https://www.netflix.com')
+})
+
+test('a Wallos payment has no link when the instance URL is unknown', () => {
+  const event = mapWallosPayment(WALLOS_SUBSCRIPTION, '2026-08-07')
+
+  assert.equal(event.url, null)
 })
