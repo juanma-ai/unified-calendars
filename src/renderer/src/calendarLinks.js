@@ -27,5 +27,9 @@ export function getCalendarLink(calendar) {
     return { label: 'Open in Wallos', url: calendar.url }
   }
 
+  if (calendar?.source === 'vikunja' && calendar.url) {
+    return { label: 'Open project in Vikunja', url: calendar.url }
+  }
+
   return null
 }

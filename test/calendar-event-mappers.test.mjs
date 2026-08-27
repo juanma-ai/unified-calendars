@@ -6,7 +6,9 @@ import {
   mapTrackedEntry,
   mapTrelloCard,
   mapLinearIssue,
-  mapWallosPayment
+  mapWallosPayment,
+  mapVikunjaTask,
+  isRealVikunjaDate
 } from '../src/main/sources/calendarEventMappers.js'
 
 test('Google events retain calendar and recurring-series identity', () => {
@@ -189,4 +191,55 @@ test('a Wallos payment has no link when the instance URL is unknown', () => {
   const event = mapWallosPayment(WALLOS_SUBSCRIPTION, '2026-08-07')
 
   assert.equal(event.url, null)
+})
+
+test('Vikunja tasks become points in time on their due date', () => {
+  const event = mapVikunjaTask(
+    {
+      id: 254,
+      title: 'Dar de baja Three',
+      done: false,
+      due_date: '2026-08-19T10:05:00Z',
+      start_date: '2026-08-19T06:00:00Z',
+      end_date: '0001-01-01T00:00:00Z',
+      project_id: 20,
+      assignees: [{ id: 2, name: '', username: 'Laura' }]
+    },
+    { id: 20, name: 'Family', color: '#1973ff' },
+    'https://tareas.example.test'
+  )
+
+  assert.equal(event.source, 'vikunja')
+  assert.equal(event.id, 'vikunja:254')
+  assert.equal(event.calendarId, 'vikunja:20')
+  assert.equal(event.calendarName, 'Family')
+  assert.equal(event.providerCalendarId, '20')
+  assert.equal(event.providerEventId, '254')
+  assert.equal(event.allDay, false)
+  // A task is a deadline, not an interval: start_date is deliberately ignored.
+  assert.equal(event.start, '2026-08-19T10:05:00Z')
+  assert.equal(event.end, '2026-08-19T10:05:00Z')
+  assert.equal(event.status, 'confirmed')
+  assert.equal(event.url, 'https://tareas.example.test/tasks/254')
+  // Vikunja leaves `name` empty and puts the real label in `username`.
+  assert.deepEqual(event.assignees, [{ id: '2', name: 'Laura', username: 'Laura' }])
+})
+
+test('a done Vikunja task maps to completed', () => {
+  const event = mapVikunjaTask(
+    { id: 1, title: 'Done', done: true, due_date: '2026-08-19T10:05:00Z', project_id: 20 },
+    { id: 20, name: 'Family', color: '#1973ff' }
+  )
+
+  assert.equal(event.status, 'completed')
+  assert.deepEqual(event.assignees, [])
+  assert.equal(event.url, null)
+})
+
+test('the Go zero time counts as no date, not the year 1', () => {
+  assert.equal(isRealVikunjaDate('0001-01-01T00:00:00Z'), false)
+  assert.equal(isRealVikunjaDate(null), false)
+  assert.equal(isRealVikunjaDate(''), false)
+  assert.equal(isRealVikunjaDate('not a date'), false)
+  assert.equal(isRealVikunjaDate('2026-08-19T10:05:00Z'), true)
 })

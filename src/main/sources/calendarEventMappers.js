@@ -174,3 +174,52 @@ export function mapTrackedEntry(entry, notes = [], options = {}) {
     raw: entry
   }
 }
+
+/**
+ * Vikunja serializes an unset date as the Go zero time (`0001-01-01T00:00:00Z`) rather
+ * than null, so any year <= 1 has to be read as "no date". Without this guard every
+ * undated task would land on the calendar in the year 1.
+ */
+export function isRealVikunjaDate(value) {
+  if (!value) return false
+  const time = Date.parse(value)
+  if (Number.isNaN(time)) return false
+  return new Date(time).getUTCFullYear() > 1
+}
+
+/**
+ * A Vikunja task is a point in time on its due date, like a Trello card, not an
+ * interval: `start_date`/`end_date` exist but describe when work is scheduled, which is
+ * a different thing from the deadline the calendar shows. Each project is its own
+ * calendar. Assignee names come back empty on this API, so `username` is the real label.
+ * No `assignedToMe`: the API gives no "me" id without an extra request, and the renderer
+ * only dims unassigned pills for Trello, so a guessed value would buy nothing.
+ */
+export function mapVikunjaTask(task, project, baseUrl = null) {
+  const calendarId = `vikunja:${project.id}`
+  const assignees = (task.assignees ?? []).map((user) => ({
+    id: String(user.id),
+    name: user.name || user.username || 'Unknown user',
+    username: user.username ?? null
+  }))
+
+  return {
+    source: 'vikunja',
+    calendarId,
+    calendarName: project.name,
+    calendarDefaultColor: project.color ?? '#1973ff',
+    calendarDefaultVisible: false,
+    id: `vikunja:${task.id}`,
+    providerCalendarId: String(project.id),
+    providerEventId: String(task.id),
+    seriesId: null,
+    title: task.title,
+    start: task.due_date,
+    end: task.due_date,
+    allDay: false,
+    url: baseUrl ? `${baseUrl}/tasks/${task.id}` : null,
+    status: task.done ? 'completed' : 'confirmed',
+    assignees,
+    raw: task
+  }
+}
