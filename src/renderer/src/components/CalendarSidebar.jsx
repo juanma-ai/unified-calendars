@@ -21,7 +21,8 @@ const SOURCE_LABELS = {
   linear: 'Linear',
   reminders: 'Reminders',
   timetracker: 'Time Tracker',
-  wallos: 'Wallos'
+  wallos: 'Wallos',
+  vikunja: 'Vikunja'
 }
 
 function compactAccountLabel(value) {

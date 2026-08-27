@@ -35,5 +35,13 @@ export const config = {
   wallos: {
     baseUrl: process.env.WALLOS_BASE_URL,
     apiKey: process.env.WALLOS_API_KEY
+  },
+  vikunja: {
+    baseUrl: process.env.VIKUNJA_BASE_URL,
+    token: process.env.VIKUNJA_TOKEN,
+    projectIds: (process.env.VIKUNJA_PROJECT_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
   }
 }

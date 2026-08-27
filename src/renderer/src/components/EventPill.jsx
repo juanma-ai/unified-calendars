@@ -11,7 +11,8 @@ const OPEN_IN_LABELS = {
   google: 'Open in Google Calendar',
   trello: 'Open in Trello',
   linear: 'Open in Linear',
-  wallos: 'Open in Wallos'
+  wallos: 'Open in Wallos',
+  vikunja: 'Open in Vikunja'
 }
 
 function getShortAssigneeName(assignee) {
