@@ -13,6 +13,18 @@ const safeReturn = value => {
   } catch { return '/' }
 }
 
+// Pocket ID's public issuer stays HTTPS; only server-to-server traffic uses
+// the dedicated Docker backend network. Never follow an endpoint off the issuer.
+export function createInternalOidcFetch(issuer, internalUrl, request = fetch) {
+  const publicOrigin = new URL(issuer).origin
+  const internalOrigin = new URL(internalUrl).origin
+  return (input, options) => {
+    const url = new URL(input)
+    if (url.origin !== publicOrigin) throw new Error('Unexpected OIDC endpoint origin')
+    return request(internalOrigin + url.pathname + url.search, { ...options, redirect: 'error' })
+  }
+}
+
 export async function createAuth(env, { oidc = client, now = Date.now } = {}) {
   for (const key of ['WEB_PUBLIC_URL', 'OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'WEB_ALLOWED_SUBJECTS']) {
     if (!env[key]) throw new Error(`Missing ${key}`)
@@ -21,7 +33,8 @@ export async function createAuth(env, { oidc = client, now = Date.now } = {}) {
   if (publicUrl.protocol !== 'https:') throw new Error('WEB_PUBLIC_URL must use HTTPS')
   const allowed = new Set(env.WEB_ALLOWED_SUBJECTS.split(',').map(s => s.trim()).filter(Boolean))
   if (!allowed.size) throw new Error('No allowed family identities')
-  const configuration = await oidc.discovery(new URL(env.OIDC_ISSUER), env.OIDC_CLIENT_ID, env.OIDC_CLIENT_SECRET)
+  const transport = env.OIDC_INTERNAL_URL ? { [oidc.customFetch]: createInternalOidcFetch(env.OIDC_ISSUER, env.OIDC_INTERNAL_URL) } : undefined
+  const configuration = await oidc.discovery(new URL(env.OIDC_ISSUER), env.OIDC_CLIENT_ID, env.OIDC_CLIENT_SECRET, undefined, transport)
   const pending = new Map(), sessions = new Map()
   const redirect = (res, location) => { res.writeHead(302, { Location: location }); res.end(); return false }
   return async (req, res, url) => {

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createAuth } from '../src/server/auth.mjs'
+import { createAuth, createInternalOidcFetch } from '../src/server/auth.mjs'
 const env = { WEB_PUBLIC_URL: 'https://family.test', OIDC_ISSUER: 'https://identity.test', OIDC_CLIENT_ID: 'id', OIDC_CLIENT_SECRET: 'secret', WEB_ALLOWED_SUBJECTS: 'family-sub' }
 function response() { return { headers: {}, setHeader(k, v) { this.headers[k] = v }, writeHead(status, headers) { this.status = status; Object.assign(this.headers, headers) }, end() {} } }
 test('requires configuration and HTTPS', async () => {
@@ -32,4 +32,13 @@ test('login binds PKCE, state, nonce, family identity and expiring secure sessio
   const outsider = response()
   await auth({ method: 'GET', headers: {} }, outsider, new URL('https://family.test/auth/login?returnTo=https://evil.test'))
   await assert.rejects(auth({ method: 'GET', headers: { cookie: outsider.headers['Set-Cookie'].split(';')[0] } }, response(), new URL('https://family.test/auth/callback')), { status: 403 })
+})
+
+ test('private OIDC transport preserves paths and refuses off-issuer endpoints', async () => {
+  let received
+  const request = createInternalOidcFetch('https://identity.test:8448', 'http://family-pocket-id:1411', async (...args) => { received = args; return new Response('{}') })
+  await request('https://identity.test:8448/api/oidc/token?x=1', { method: 'POST', body: 'code=test' })
+  assert.equal(received[0], 'http://family-pocket-id:1411/api/oidc/token?x=1')
+  assert.equal(received[1].body, 'code=test'); assert.equal(received[1].redirect, 'error')
+  assert.throws(() => request('https://other.test/token', {}), /Unexpected/)
 })
