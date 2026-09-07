@@ -6,7 +6,7 @@ Web de solo lectura de Radicale y Vikunja, reutilizando el calendario de Electro
 - Enlace de día: `/?view=day&date=2026-09-07`. La fecha es civil en la zona del calendario.
 - Coolify: `calendario-familiar`, UUID `60lvpg1czhavu9o5gogomwpc`, proyecto Agente Familia.
 - Rama de despliegue: `feature/family-web`. La rama principal de Electron no se ha cambiado.
-- Contenedor: puerto 3000; host: `127.0.0.1:8288`; Tailscale Serve: 8450.
+- Contenedor: puerto 3000; host: `127.0.0.1:8290`; Tailscale Serve: 8450.
 - Login: Pocket ID en 8448, callback `/auth/callback`; identidades de JuanMa y Laura por `sub`.
 - Preferencias (colores, filtros y zonas): locales a cada navegador. Eventos y tareas no se modifican.
 - Las sesiones caducan a las 12 horas; un reinicio requiere volver a iniciar sesión.
@@ -35,7 +35,7 @@ La red es propia y `connect_to_docker_network` está desactivado en Coolify.
 El nombre del VPS tiene entrada explícita en `extra_hosts`, ya que el DNS del VPS no resuelve su propio nombre MagicDNS.
 HTTPS sigue validando su certificado.
 
-Variables de runtime en Coolify (ninguna se inyecta al build):
+Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no admite `is_buildtime`: verificar/desactivar esa casilla tras crear variables; no basta enviar `is_build_time: false`:
 
 - `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_ALLOWED_SUBJECTS`.
 - `RADICALE_URL`, `RADICALE_USER`, `RADICALE_PASSWORD`, `RADICALE_CALENDAR_PATH`.
@@ -49,7 +49,7 @@ Se han configurado los submódulos y el webhook de GitHub en Coolify.
 No se debe actualizar el submódulo a un commit que no esté publicado en casa-agent.
 
 ```sh
-ssh coolify-vps 'tailscale serve --bg --https=8450 http://127.0.0.1:8288'
+ssh coolify-vps 'tailscale serve --bg --https=8450 http://127.0.0.1:8290'
 ```
 
 ## Acceso de Laura: condición de aceptación
