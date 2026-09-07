@@ -32,12 +32,13 @@ npm run start:web     # Requiere las variables de la sección siguiente
 
 Compose: `docs/web.compose.yaml` (usar `docker compose --project-directory . -f docs/web.compose.yaml`; Coolify ya fija el directorio raíz). Dockerfile: `Dockerfile.web`.
 La red es propia y `connect_to_docker_network` está desactivado en Coolify.
-El nombre del VPS tiene entrada explícita en `extra_hosts`, ya que el DNS del VPS no resuelve su propio nombre MagicDNS.
-HTTPS sigue validando su certificado.
+La red externa dedicada `family-calendar-backend` conecta la web, Radicale y Pocket ID. No es la red compartida `coolify`.
+Radicale se lee por `http://family-radicale:5232`; el transporte OIDC interno usa `http://family-pocket-id:1411`, conservando el issuer público HTTPS y rechazando endpoints de otro origen. El navegador sigue entrando exclusivamente por HTTPS/Tailscale.
+Los proveedores deben conservar esa red y sus alias en sus compose de Coolify.
 
 Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no admite `is_buildtime`: verificar/desactivar esa casilla tras crear variables; no basta enviar `is_build_time: false`:
 
-- `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_ALLOWED_SUBJECTS`.
+- `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_INTERNAL_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_ALLOWED_SUBJECTS`.
 - `RADICALE_URL`, `RADICALE_USER`, `RADICALE_PASSWORD`, `RADICALE_CALENDAR_PATH`.
 - `VIKUNJA_BASE_URL`, `VIKUNJA_TOKEN`, `VIKUNJA_PROJECT_IDS=20`.
 

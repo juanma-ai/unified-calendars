@@ -10,6 +10,7 @@ services:
     environment:
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL}
       OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_INTERNAL_URL: ${OIDC_INTERNAL_URL}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
       WEB_ALLOWED_SUBJECTS: ${WEB_ALLOWED_SUBJECTS}
@@ -20,8 +21,6 @@ services:
       VIKUNJA_BASE_URL: ${VIKUNJA_BASE_URL}
       VIKUNJA_TOKEN: ${VIKUNJA_TOKEN}
       VIKUNJA_PROJECT_IDS: ${VIKUNJA_PROJECT_IDS}
-    extra_hosts:
-      - "coolify-vps.tail96bc47.ts.net:100.94.39.43"
     networks:
       - family-calendar
     cap_drop: [ALL]
@@ -31,4 +30,5 @@ services:
       - /tmp
 networks:
   family-calendar:
-    driver: bridge
+    external: true
+    name: family-calendar-backend
