@@ -1,0 +1,24 @@
+/* Loaded only by the web entry. Desktop Electron retains its own layout. */
+@media (max-width: 1100px) {
+  .app-header { grid-template-columns: 1fr; gap: 10px; }
+  .app-header__brand { justify-content: space-between; }
+  .app-header__navigation { flex-wrap: wrap; gap: 10px; }
+  .app-header__actions { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+  .app-header__range { font-size: 16px; white-space: normal; }
+}
+@media (max-width: 640px) {
+  body { padding: 0; }
+  .app-shell { border: 0; border-radius: 0; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .app-header { padding: 10px 12px; }
+  .app-header__brand h1 { font-size: 22px; }
+  .app-header__actions .components-button { min-width: 0; padding: 0 12px; }
+  .app-header__view-switcher { order: -1; width: 100%; }
+  .app-header__week-nav .components-button { padding: 0 12px; }
+  .calendar-sidebar { max-height: 185px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .calendar-sidebar__body { padding: 10px 12px; }
+  .calendar-sidebar__section { margin-top: 10px; }
+  .calendar-sidebar__footer { padding: 6px 12px; }
+  .calendar-main { min-height: 0; }
+  .settings-card-grid { grid-template-columns: minmax(0, 1fr); }
+}
