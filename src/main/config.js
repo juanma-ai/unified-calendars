@@ -9,6 +9,12 @@ const envPath = isPackaged
 loadEnv({ path: envPath })
 
 export const config = {
+  radicale: {
+    baseUrl: process.env.RADICALE_URL,
+    username: process.env.RADICALE_USER,
+    password: process.env.RADICALE_PASSWORD,
+    calendarPath: process.env.RADICALE_CALENDAR_PATH || '/familia/casa/'
+  },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
