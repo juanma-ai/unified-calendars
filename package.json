@@ -9,7 +9,10 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "build:reminders-helper": "zsh native/reminders-helper/build-app.sh",
-    "package:mac": "npm run build:reminders-helper && npm run build && electron-builder --mac dir && zsh scripts/sign-local-mac.sh"
+    "package:mac": "npm run build:reminders-helper && npm run build && electron-builder --mac dir && zsh scripts/sign-local-mac.sh",
+    "build:web": "vite build --config vite.web.config.js && vite build --config vite.web.config.js --mode server",
+    "start:web": "node dist/server/index.mjs",
+    "test": "node --test test/*.test.mjs test/*.test.js"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -20,6 +23,7 @@
     "electron-store": "^10.0.0",
     "google-auth-library": "^9.15.0",
     "googleapis": "^144.0.0",
+    "openid-client": "6.8.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
