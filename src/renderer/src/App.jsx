@@ -14,6 +14,7 @@ import { buildCalendars, filterVisibleEvents, isSourceEnabled } from './calendar
 import { useLiveClock } from './liveClock.js'
 import { DEFAULT_TRACKER_DB_PATH, shouldShowSourceLegend } from './sourceLegend.js'
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
+import { readCalendarLocation } from './calendarLocation.js'
 import { getSystemTimeZone } from './calendarTimeZones.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
@@ -34,10 +35,12 @@ function readStoredView() {
 }
 
 export function App() {
-  const [calendarView, setCalendarView] = useState(readStoredView)
+  const capabilities = window.calendarAPI.capabilities
+  const readOnly = capabilities?.readOnly === true
+  const [calendarView, setCalendarView] = useState(() => readCalendarLocation(window.location.search, readStoredView()).view)
   // The anchor is any date inside the range; each view snaps it to its own
   // boundaries, so it stays a plain "the calendar is looking at this date".
-  const [anchorDate, setAnchorDate] = useState(() => new Date())
+  const [anchorDate, setAnchorDate] = useState(() => readCalendarLocation(window.location.search, readStoredView()).date)
   const [events, setEvents] = useState([])
   const [availableCalendars, setAvailableCalendars] = useState([])
   const [googleAccounts, setGoogleAccounts] = useState([])
@@ -121,21 +124,26 @@ export function App() {
   // Paint instantly from whatever was cached on disk from the last run, then
   // kick off a live fetch for the current range in the background.
   useEffect(() => {
-    window.calendarAPI.getPreferences().then(setPreferences)
-    window.calendarAPI.getGoogleAccounts().then(setGoogleAccounts)
+    window.calendarAPI.getPreferences().then(value => {
+      setPreferences(value)
+      if (new URLSearchParams(window.location.search).has('date')) {
+        setAnchorDate(readCalendarLocation(window.location.search, readStoredView(), new Date(), value.timeZone).date)
+      }
+    }).catch(error => setActionError(getIpcErrorMessage(error)))
+    window.calendarAPI.getGoogleAccounts().then(setGoogleAccounts).catch(error => setActionError(getIpcErrorMessage(error)))
     window.calendarAPI.getCachedEvents().then((cached) => {
       if (cached?.events) setEvents(cached.events)
       if (cached?.calendars) setAvailableCalendars(cached.calendars)
       if (cached?.statuses) setStatuses(cached.statuses)
-    })
+    }).catch(error => setActionError(getIpcErrorMessage(error)))
   }, [])
 
   useEffect(() => {
-    refresh()
+    refresh().catch(error => setActionError(getIpcErrorMessage(error)))
   }, [refresh])
 
   useEffect(() => {
-    const interval = setInterval(refresh, POLL_INTERVAL_MS)
+    const interval = setInterval(() => refresh().catch(error => setActionError(getIpcErrorMessage(error))), POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [refresh])
 
@@ -168,6 +176,7 @@ export function App() {
         setStatuses(result.statuses)
         setAvailableCalendars(result.calendars)
       })
+      .catch(error => setActionError(getIpcErrorMessage(error)))
       .finally(() => setRefreshing(false))
   }, [range])
 
@@ -226,11 +235,11 @@ export function App() {
   const canEditEvent = useCallback(
     (event) => {
       // Events restored from the on-disk cache predate provider ids; a refresh fixes them.
-      if (!event.providerEventId) return false
+      if (readOnly || !event.providerEventId) return false
       if (event.source === 'google') return editableGoogleAccounts.has(event.sourceAccountId)
       return event.source === 'trello' || event.source === 'reminders'
     },
-    [editableGoogleAccounts]
+    [editableGoogleAccounts, readOnly]
   )
 
   const handleEventTimeChange = useCallback(
@@ -350,6 +359,7 @@ export function App() {
           </Notice>
         )}
         <SettingsScreen
+          capabilities={capabilities}
           calendars={calendars}
           googleAccounts={googleAccounts}
           hiddenEvents={preferences.hiddenEvents}
@@ -389,6 +399,7 @@ export function App() {
       />
       <div className="app">
         <CalendarSidebar
+          enabledSources={capabilities?.sources}
           anchorDate={anchorDate}
           calendars={sidebarCalendars}
           calendarCountBySource={calendarCountBySource}
@@ -403,7 +414,7 @@ export function App() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           statuses={statuses}
-          trackedEnabled={isSourceEnabled(preferences, 'timetracker')}
+          trackedEnabled={capabilities?.desktop !== false && isSourceEnabled(preferences, 'timetracker')}
           trackedEvents={trackedEvents}
         />
         <main className="calendar-main">
@@ -416,11 +427,11 @@ export function App() {
             <MonthView
               anchorDate={anchorDate}
               events={visibleEvents}
-              onCompleteReminder={handleCompleteReminder}
+              onCompleteReminder={readOnly ? undefined : handleCompleteReminder}
               onHideEvent={handleHideEvent}
               onOpenDay={openDay}
               preferences={preferences}
-              sessionActions={sessionActions}
+              sessionActions={readOnly ? undefined : sessionActions}
               timeZone={preferences.timeZone}
             />
           )}
@@ -428,10 +439,10 @@ export function App() {
             <AgendaView
               anchorDate={anchorDate}
               events={visibleEvents}
-              onCompleteReminder={handleCompleteReminder}
+              onCompleteReminder={readOnly ? undefined : handleCompleteReminder}
               onHideEvent={handleHideEvent}
               preferences={preferences}
-              sessionActions={sessionActions}
+              sessionActions={readOnly ? undefined : sessionActions}
               timeZone={preferences.timeZone}
             />
           )}
@@ -446,7 +457,7 @@ export function App() {
           )}
           {/* Only the day/week time grid draws tracked lane bars, so only it needs the key. */}
           {(calendarView === 'day' || calendarView === 'week') &&
-            shouldShowSourceLegend(preferences, statuses) && (
+            capabilities?.desktop !== false && shouldShowSourceLegend(preferences, statuses) && (
               <SourceLegend dbPath={trackerDbPath} />
             )}
           {(calendarView === 'day' || calendarView === 'week') && (
@@ -456,12 +467,12 @@ export function App() {
               canEditEvent={canEditEvent}
               events={visibleEvents}
               now={now}
-              onCompleteReminder={handleCompleteReminder}
+              onCompleteReminder={readOnly ? undefined : handleCompleteReminder}
               onEventTimeChange={handleEventTimeChange}
               onHideEvent={handleHideEvent}
               preferences={preferences}
               secondaryTimeZones={preferences.secondaryTimeZones}
-              sessionActions={sessionActions}
+              sessionActions={readOnly ? undefined : sessionActions}
               timeZone={preferences.timeZone}
               timeZoneCity={preferences.timeZoneCity}
             />
