@@ -158,6 +158,24 @@ test('VIKUNJA_PROJECT_IDS restricts which projects reach the calendar', async (t
   assert.deepEqual(result.calendars.map((calendar) => calendar.calendarId), ['vikunja:23'])
 })
 
+test('configured projects missing from the project list surface as an access error', async (t) => {
+  useConfig(t, { baseUrl: 'https://tareas.example.test', token: 'tk_test', projectIds: ['20'] })
+
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.includes('/projects')
+        ? { ...PROJECTS, items: PROJECTS.items.filter((project) => project.id !== 20) }
+        : { items: [], total: 0, page: 1, per_page: 1000, total_pages: 1 }
+  })
+
+  const result = await fetchVikunjaEvents(...RANGE)
+
+  assert.deepEqual(result.events, [])
+  assert.equal(result.statuses[0].ok, false)
+  assert.match(result.statuses[0].lastError, /configured projects unavailable: 20/)
+})
+
 test('a failing request surfaces as a status, never a throw', async (t) => {
   useConfig(t, { baseUrl: 'https://tareas.example.test', token: 'tk_test', projectIds: [] })
 
