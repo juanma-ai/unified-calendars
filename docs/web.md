@@ -63,7 +63,7 @@ Tras aplicar la política, comprobar el filtro real con `tailscale debug netmap`
 
 Pruebas: adaptador contra fixture real del iPhone; ocurrencias expandidas y límites DST en casa-agent; caché, puente, rangos, rechazo de mutaciones, sesión, PKCE/state/nonce y restricción de identidad; deep links en zonas distintas; orden de fuentes.
 
-`npm test` incluye pruebas de integración de Recordatorios que necesitan el helper nativo construido y autorizado en macOS. Para la suite unitaria, excluir `test/reminders.integration.test.mjs`; no confundir ese requisito con un fallo web.
+`npm test` ejecuta la suite unitaria portable. `npm run test:integration` ejecuta las pruebas de Recordatorios que necesitan el helper nativo construido y autorizado en macOS; no confundir ese requisito con un fallo web.
 
 Prueba visual con Playwright: datos controlados por la API, día concreto por URL, dos fuentes, ajustes sin Google/contador, ancho 1440 y 390.
 La validación de producción y los pasos pendientes se registran al terminar el despliegue.

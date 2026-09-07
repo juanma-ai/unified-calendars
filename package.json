@@ -12,7 +12,8 @@
     "package:mac": "npm run build:reminders-helper && npm run build && electron-builder --mac dir && zsh scripts/sign-local-mac.sh",
     "build:web": "vite build --config vite.web.config.js && vite build --config vite.web.config.js --mode server",
     "start:web": "node dist/server/index.mjs",
-    "test": "node --test test/*.test.mjs test/*.test.js"
+    "test": "node scripts/test-unit.mjs",
+    "test:integration": "node --test test/reminders.integration.test.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
