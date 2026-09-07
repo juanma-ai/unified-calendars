@@ -16,6 +16,7 @@ import { formatDuration } from '../trackedTime.js'
 import { buildTrackedSummary, trackedMsByCalendar } from '../trackedSummary.js'
 
 const SOURCE_LABELS = {
+  radicale: 'Radicale',
   google: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
@@ -181,6 +182,7 @@ export function CalendarSidebar({
   searchQuery,
   setSearchQuery,
   statuses,
+  enabledSources = null,
   trackedEnabled = true,
   trackedEvents = []
 }) {
@@ -230,7 +232,7 @@ export function CalendarSidebar({
         />
 
         <div className="calendar-sidebar__scroll-area">
-          {Object.entries(SOURCE_LABELS).map(([source, label]) => {
+          {Object.entries(SOURCE_LABELS).filter(([source]) => !enabledSources || enabledSources.includes(source)).map(([source, label]) => {
             const sourceCalendars = calendars.filter((calendar) => calendar.source === source)
             const hasAvailableCalendars = Boolean(calendarCountBySource?.[source])
             const isGoogle = source === 'google'

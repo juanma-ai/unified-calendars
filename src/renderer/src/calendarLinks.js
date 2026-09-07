@@ -4,6 +4,9 @@
  * caller renders no menu item at all in that case, never a disabled one.
  */
 export function getCalendarLink(calendar) {
+  // Radicale serves CalDAV resources, not a human-readable event page.
+  if (calendar?.source === 'radicale') return null
+
   if (calendar?.source === 'google' && calendar.providerCalendarId) {
     const cid = encodeURIComponent(calendar.providerCalendarId)
     const authuser = calendar.accountEmail
