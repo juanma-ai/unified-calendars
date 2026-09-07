@@ -1,0 +1,3 @@
+[submodule "vendor/casa-agent"]
+	path = vendor/casa-agent
+	url = git@github.com:juanmaguitar/casa-agent.git
