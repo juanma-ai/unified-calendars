@@ -89,6 +89,11 @@ export async function fetchVikunjaEvents(rangeStart, rangeEnd) {
     const projectsById = buildProjects(await fetchAllPages('/projects', {}, 'projects'))
 
     const allowed = config.vikunja.projectIds
+    const unavailableProjectIds = allowed.filter((projectId) => !projectsById.has(Number(projectId)))
+    if (unavailableProjectIds.length > 0) {
+      throw new Error(`Vikunja configured projects unavailable: ${unavailableProjectIds.join(', ')}`)
+    }
+
     const tasks = await fetchAllPages(
       '/tasks',
       // Completed tasks are dropped server-side, matching filterIncompleteTrelloCards:

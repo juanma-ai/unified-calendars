@@ -1,4 +1,5 @@
 export const SOURCES = [
+  { key: 'radicale', label: 'Radicale', color: '#059669' },
   { key: 'google', label: 'Google Calendar', color: '#4285f4' },
   { key: 'trello', label: 'Trello', color: '#0079bf' },
   { key: 'linear', label: 'Linear', color: '#5e6ad2' },

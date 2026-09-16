@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createCalendarPreferencesStore } from '../src/main/calendarPreferences.js'
+import { createCalendarPreferencesStore } from '../src/shared/calendarPreferences.js'
 
 function memoryStore() {
   const values = new Map()

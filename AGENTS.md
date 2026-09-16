@@ -43,3 +43,5 @@
 - Transient feedback for a reversible action (completing a reminder) is a `Snackbar` in `.calendar-snackbars`, never a `Notice`: a full-width notice above the grid reflows the whole calendar down for something that undoes itself in ten seconds. `Notice` stays for errors, which should be sticky and demand attention. The snackbar is offset past the 320px sidebar so it never covers the source-status footer.
 - `TrackedSessionPopover` is no longer read-only and must not claim to be: "edit in Time Tracker" named a plugin that is being retired, so the card itself is where a session's notes are added, corrected and removed. A note is addressed by `notes.id` — never by `ts`, which two notes can share and which the card rounds to the minute — and an edit writes back `rawText`, not the parsed text, or the `todo:` marker is stripped off every note it touches. Notes without an id come from a database read before the column was selected; those render but offer no editing.
 
+
+- La versión web y Electron deben tener entradas, puentes y compilaciones independientes. Todo cambio compartido debe preservar y verificar el comportamiento de Electron.

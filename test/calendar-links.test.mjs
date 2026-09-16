@@ -51,3 +51,7 @@ test('returns null for sources with no web destination', () => {
   assert.equal(getCalendarLink({ source: 'timetracker', providerCalendarId: 'calendar-app' }), null)
   assert.equal(getCalendarLink(undefined), null)
 })
+
+test('Radicale never links to a DAV resource even if a URL is present', () => {
+  assert.equal(getCalendarLink({ source: 'radicale', url: 'https://calendar.test/familia/casa/a.ics' }), null)
+})

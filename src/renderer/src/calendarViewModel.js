@@ -1,4 +1,5 @@
 const SOURCE_ORDER = {
+  radicale: 2.5,
   google: 0,
   trello: 1,
   linear: 2,
@@ -97,7 +98,7 @@ export function buildCalendars(events, preferenceValue, availableCalendars = [])
   }
 
   return [...calendars.values()].sort((a, b) => {
-    const sourceDifference = SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source]
+    const sourceDifference = (SOURCE_ORDER[a.source] ?? 999) - (SOURCE_ORDER[b.source] ?? 999)
     return sourceDifference || a.name.localeCompare(b.name)
   })
 }

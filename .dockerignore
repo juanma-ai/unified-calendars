@@ -1,0 +1,9 @@
+**/.git
+**/node_modules
+.env*
+**/.env*
+release
+out
+dist
+native
+*.log

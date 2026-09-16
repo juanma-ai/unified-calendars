@@ -233,3 +233,11 @@ test('a disabled source drops out of every view through one choke point', () => 
   const visible = filterVisibleEvents(tracked, { sourceEnabled: { timetracker: false } })
   assert.deepEqual(visible.map((event) => event.title), ['Standup'])
 })
+
+test('Radicale sorts by source before Vikunja regardless of calendar name', () => {
+  const calendars = buildCalendars([], {}, [
+    { source: 'vikunja', calendarId: 'vikunja:20', calendarName: 'AAA Tasks' },
+    { source: 'radicale', calendarId: 'radicale:familia', calendarName: 'ZZZ Familia' }
+  ])
+  assert.deepEqual(calendars.map(c => c.source), ['radicale', 'vikunja'])
+})

@@ -24,6 +24,7 @@ import {
 import { TimeZonePicker } from './TimeZonePicker.jsx'
 
 const SOURCE_NAMES = {
+  radicale: 'Radicale',
   google: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
@@ -720,6 +721,7 @@ function HiddenEventsTab({ hiddenEvents, onRestore }) {
 }
 
 export function SettingsScreen({
+  capabilities = null,
   calendars,
   googleAccounts,
   hiddenEvents,
@@ -783,17 +785,17 @@ export function SettingsScreen({
 
           return (
             <div className="settings-card-grid">
-              <GoogleConnectionCard
+              {capabilities?.desktop !== false && <GoogleConnectionCard
                 accounts={googleAccounts}
                 onConnect={onConnectGoogle}
                 onDisconnect={onDisconnectGoogle}
                 onReconnect={onReconnectGoogle}
                 statuses={statuses}
-              />
-              {['trello', 'linear', 'vikunja', 'reminders', 'wallos'].map((source) => (
+              />}
+              {(capabilities?.sources || ['radicale', 'trello', 'linear', 'vikunja', 'reminders', 'wallos']).map((source) => (
                 <ConnectionCard key={source} source={source} statuses={statuses} />
               ))}
-              <TimeTrackerCard statuses={statuses} onSourceDataChanged={onSourceDataChanged} />
+              {capabilities?.desktop !== false && <TimeTrackerCard statuses={statuses} onSourceDataChanged={onSourceDataChanged} />}
             </div>
           )
         }}
