@@ -97,3 +97,8 @@ test('per-user source without a password reports not-connected and makes no requ
   assert.equal(requests.length, 0)
   assert.deepEqual(result.statuses, [{ source: 'radicale', ok: false, lastError: 'not-connected' }])
 })
+test('attendees come from one X-FAMILIA-ASISTENTE line per person', async t => {
+  setup(t, wrap('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nX-FAMILIA-ASISTENTE:JuanMa\r\nX-FAMILIA-ASISTENTE;X-ANY=1:Laura\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:b\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nEND:VEVENT\r\nEND:VCALENDAR'))
+  const { events } = await fetchRadicaleEvents(...range)
+  assert.deepEqual(events.map(e => e.attendees), [['JuanMa', 'Laura'], []])
+})

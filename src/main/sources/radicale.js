@@ -36,6 +36,8 @@ async function reportEvents({ baseUrl, authorization, calendar, calendarPath, ra
       start: event.allDay ? civilDate(event.start) : event.start.toISOString(),
       end: event.allDay ? civilDate(event.end) : event.end.toISOString(),
       allDay: Boolean(event.allDay), tzUnknown: event.tzUnknown,
+      // One X-FAMILIA-ASISTENTE line per person; see src/server/radicaleWrite.mjs.
+      attendees: [...String(event.raw ?? '').matchAll(/^X-FAMILIA-ASISTENTE(?:;[^:\r\n]*)?:(.+?)\r?$/gm)].map(m => m[1].trim()),
       url: null, status: 'confirmed'
     }))
   )
