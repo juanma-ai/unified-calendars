@@ -35,11 +35,12 @@ export function eventToForm(event, timeZone) {
   if (event.allDay && DATE_ONLY.test(event.start)) {
     // The form shows the last day the event covers; the stored end is exclusive.
     const end = DATE_ONLY.test(event.end ?? '') ? addDays(civilDate(event.end), -1) : civilDate(event.start)
-    return { ...base, allDay: true, startDate: event.start, endDate: formatCivil(end), startTime: '09:00', endTime: '10:00' }
+    const endDate = formatCivil(end)
+    return { ...base, allDay: true, multiDay: endDate > event.start, startDate: event.start, endDate, startTime: '09:00', endTime: '10:00' }
   }
   const start = zonedParts(event.start, timeZone)
   const end = zonedParts(event.end ?? event.start, timeZone)
-  return { ...base, allDay: false, startDate: start.date, startTime: start.time, endDate: end.date, endTime: end.time }
+  return { ...base, allDay: false, multiDay: end.date !== start.date, startDate: start.date, startTime: start.time, endDate: end.date, endTime: end.time }
 }
 
 // A new event starts at the next full hour when the anchor is today, otherwise
@@ -54,25 +55,32 @@ export function newEventForm({ anchorDate, now = new Date(), timeZone, calendarI
     : new TZDate(year, month - 1, date, 9, 0, zone)
   const end = addHours(start, 1)
   return {
-    title: '', calendarId, location: '', description: '', attendees: [], allDay: false,
+    title: '', calendarId, location: '', description: '', attendees: [], allDay: false, multiDay: false,
     startDate: format(start, 'yyyy-MM-dd'), startTime: format(start, 'HH:mm'),
     endDate: format(end, 'yyyy-MM-dd'), endTime: format(end, 'HH:mm')
   }
 }
 
+// Most events are a single day, so the end date only counts once the person
+// switches on "Varios días"; until then the event ends on the day it starts.
 export function formTimes(form, timeZone) {
-  if (form.allDay) return { start: form.startDate, end: formatCivil(addDays(civilDate(form.endDate), 1)) }
-  return { start: toInstant(form.startDate, form.startTime, timeZone), end: toInstant(form.endDate, form.endTime, timeZone) }
+  const endDate = form.multiDay ? form.endDate : form.startDate
+  if (form.allDay) return { start: form.startDate, end: formatCivil(addDays(civilDate(endDate), 1)) }
+  return { start: toInstant(form.startDate, form.startTime, timeZone), end: toInstant(endDate, form.endTime, timeZone) }
 }
 
 // Returns the message to show, or null when the form can be saved.
 export function validateForm(form, timeZone) {
   if (!form.title.trim()) return 'Ponle un título al evento.'
-  if (!DATE_ONLY.test(form.startDate) || !DATE_ONLY.test(form.endDate)) return 'Elige las fechas de inicio y fin.'
+  if (!DATE_ONLY.test(form.startDate)) return 'Elige la fecha.'
+  if (form.multiDay && !DATE_ONLY.test(form.endDate)) return 'Elige la fecha de fin.'
   if (!form.allDay && (!/^\d{2}:\d{2}$/.test(form.startTime) || !/^\d{2}:\d{2}$/.test(form.endTime))) return 'Elige las horas de inicio y fin.'
   const { start, end } = formTimes(form, timeZone)
   const ends = form.allDay ? civilDate(end) > civilDate(start) : Date.parse(end) > Date.parse(start)
-  return ends ? null : 'El final tiene que ser después del inicio.'
+  if (ends) return null
+  return form.multiDay || form.allDay
+    ? 'El final tiene que ser después del inicio.'
+    : 'La hora de fin tiene que ser después de la de inicio. Para cruzar la medianoche, activa «Varios días».'
 }
 
 export function formToFields(form, timeZone) {
@@ -119,6 +127,7 @@ export async function saveEventForm({ api, event, form, calendars, timeZone }) {
 // with the new start instead of blocking the save.
 export function updateForm(form, key, value, timeZone) {
   const next = { ...form, [key]: value }
+  if (key === 'multiDay' && !value) return { ...next, endDate: form.startDate }
   if ((key !== 'startDate' && key !== 'startTime') || !value || !DATE_ONLY.test(next.startDate)) return next
   if (form.allDay) {
     const days = DATE_ONLY.test(form.endDate) && DATE_ONLY.test(form.startDate)
