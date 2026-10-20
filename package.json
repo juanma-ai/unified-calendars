@@ -24,6 +24,7 @@
     "electron-store": "^10.0.0",
     "google-auth-library": "^9.15.0",
     "googleapis": "^144.0.0",
+    "ical.js": "^2.2.1",
     "openid-client": "6.8.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

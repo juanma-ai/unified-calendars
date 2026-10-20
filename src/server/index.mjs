@@ -4,9 +4,10 @@ import { resolve, extname, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createFamilyAggregator } from '../main/sourceRegistry.js'
 import { createCalendarApi } from './calendarApi.mjs'
+import { createFamilyWriter } from './radicaleWrite.mjs'
 
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' }
-export function createWebServer({ auth, api = createCalendarApi(createFamilyAggregator()), publicUrl, staticDir = resolve('dist/web') }) {
+export function createWebServer({ auth, api = createCalendarApi(createFamilyAggregator(), createFamilyWriter()), publicUrl, staticDir = resolve('dist/web') }) {
   const origin = new URL(publicUrl).origin
   return createServer({ requestTimeout: 20000 }, async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')

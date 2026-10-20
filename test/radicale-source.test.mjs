@@ -24,6 +24,7 @@ test('reads the actual iPhone fixture using REPORT expand and Depth 1', async t 
   assert.equal(requests[0].options.headers.Depth, '1')
   assert.match(requests[0].options.body, /expand/)
   assert.equal(result.events[0].url, null)
+  assert.equal(result.events[0].recurrenceId, null)
 })
 test('all-day dates remain civil and the end remains exclusive', async t => {
   setup(t, wrap('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:day\r\nDTSTART;VALUE=DATE:20261024\r\nDTEND;VALUE=DATE:20261027\r\nEND:VEVENT\r\nEND:VCALENDAR'))
@@ -34,6 +35,7 @@ test('expanded occurrences get distinct ids', async t => {
   setup(t, wrap('BEGIN:VCALENDAR\r\n' + [7, 14].map(d => `BEGIN:VEVENT\r\nUID:series\r\nRECURRENCE-ID:202609${String(d).padStart(2, '0')}T060000Z\r\nDTSTART:202609${String(d).padStart(2, '0')}T060000Z\r\nEND:VEVENT`).join('\r\n') + '\r\nEND:VCALENDAR'))
   const { events } = await fetchRadicaleEvents(...range)
   assert.equal(events.length, 2); assert.equal(new Set(events.map(e => e.id)).size, 2)
+  assert.deepEqual(events.map(e => e.recurrenceId), ['20260907T060000Z', '20260914T060000Z'])
 })
 test('empty calendars remain visible and failures are not successful empty responses', async t => {
   setup(t, '<D:multistatus xmlns:D="DAV:"/>')
