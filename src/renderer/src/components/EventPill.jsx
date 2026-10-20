@@ -5,6 +5,7 @@ import { getEventColor } from '../calendarViewModel.js'
 import { getEventDayRange } from '../calendarViews.js'
 import { getEventPalette } from '../eventColors.js'
 import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
+import { useEventEditing } from './EventEditor.jsx'
 
 /** Label for the popover's open-in-provider item, by event source. */
 const OPEN_IN_LABELS = {
@@ -88,6 +89,8 @@ export function EventPill({
   variant = 'pill'
 }) {
   const color = getEventColor(event, preferences)
+  const editing = useEventEditing()
+  const canEdit = Boolean(editing?.canEditEvent(event))
   const assignmentKnown = event.source === 'trello' && Array.isArray(event.assignees)
   const displayColor = assignmentKnown && !event.assignedToMe ? lightenHexColor(color) : color
   const palette = getEventPalette(displayColor)
@@ -152,6 +155,16 @@ export function EventPill({
         />
       ) : (
         <MenuGroup label={event.title}>
+          {canEdit && (
+            <MenuItem
+              onClick={() => {
+                onClose()
+                editing.editEvent(event)
+              }}
+            >
+              Editar
+            </MenuItem>
+          )}
           {event.source === 'trello' && trelloAssigneeLabel && (
             <div className="event-actions-popover__meta">
               <span>Assigned: {getFullTrelloAssigneeLabel(event)}</span>
