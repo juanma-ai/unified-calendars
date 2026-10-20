@@ -46,3 +46,4 @@
 
 - La versión web y Electron deben tener entradas, puentes y compilaciones independientes. Todo cambio compartido debe preservar y verificar el comportamiento de Electron.
 - Las pruebas que escriben en Radicale van en `juanma/personal`, nunca en `familia/casa`: Agatha lee Familia y manda resumen y avisos al grupo de Telegram.
+- El formulario de evento de la web muestra por defecto una sola fecha; el rango (fecha de fin) se activa a demanda con el interruptor «Varios días» y solo aparece activado al editar un evento que ya ocupa varios días.

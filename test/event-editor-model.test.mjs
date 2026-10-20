@@ -16,7 +16,7 @@ test('a timed event opens in the calendar zone and saves back to the same instan
 })
 test('the form crosses daylight saving time correctly', () => {
   // 25 Oct 2026 is the last Sunday of October: Madrid goes from +02:00 to +01:00.
-  const form = { ...eventToForm(timed, tz), startDate: '2026-10-24', startTime: '10:00', endDate: '2026-10-25', endTime: '10:00' }
+  const form = { ...eventToForm(timed, tz), multiDay: true, startDate: '2026-10-24', startTime: '10:00', endDate: '2026-10-25', endTime: '10:00' }
   const { start, end } = formToFields(form, tz)
   assert.equal(new Date(start).toISOString(), '2026-10-24T08:00:00.000Z')
   assert.equal(new Date(end).toISOString(), '2026-10-25T09:00:00.000Z')
@@ -56,10 +56,12 @@ test('validation names the first problem', () => {
   assert.equal(validateForm(form, tz), null)
   assert.match(validateForm({ ...form, title: '  ' }, tz), /título/)
   assert.match(validateForm({ ...form, endTime: '15:00' }, tz), /después/)
-  assert.match(validateForm({ ...form, endDate: '' }, tz), /fechas/)
+  assert.match(validateForm({ ...form, startDate: '' }, tz), /Elige la fecha/)
+  assert.match(validateForm({ ...form, multiDay: true, endDate: '' }, tz), /fecha de fin/)
+  assert.equal(validateForm({ ...form, endDate: '' }, tz), null)
   assert.match(validateForm({ ...form, startTime: '' }, tz), /horas/)
   assert.equal(validateForm({ ...form, allDay: true, startTime: '', endDate: form.startDate }, tz), null)
-  assert.match(validateForm({ ...form, allDay: true, endDate: '2026-10-28' }, tz), /después/)
+  assert.match(validateForm({ ...form, allDay: true, multiDay: true, endDate: '2026-10-28' }, tz), /después/)
 })
 test('saving creates, updates and moves in that order, with the etag from the update', async () => {
   const calls = []
@@ -102,4 +104,28 @@ test('moving the start drags the end with it, keeping the duration', () => {
   assert.equal(updateForm(form, 'endTime', '19:00', tz).startTime, '16:00')
   assert.deepEqual(updateForm(form, 'startDate', '', tz), { ...form, startDate: '' })
   assert.deepEqual(updateForm(form, 'title', 'x', tz), { ...form, title: 'x' })
+})
+test('a single date is the default; the range is opt-in and only preset for multi-day events', () => {
+  const now = new Date('2026-10-20T08:00:00Z')
+  assert.equal(newEventForm({ anchorDate: new Date(2026, 9, 20), now, timeZone: tz }).multiDay, false)
+  assert.equal(eventToForm(timed, tz).multiDay, false)
+  assert.equal(eventToForm({ ...timed, allDay: true, start: '2026-10-24', end: '2026-10-25' }, tz).multiDay, false)
+  assert.equal(eventToForm({ ...timed, allDay: true, start: '2026-10-24', end: '2026-10-27' }, tz).multiDay, true)
+  assert.equal(eventToForm({ ...timed, end: '2026-10-30T09:00:00.000Z' }, tz).multiDay, true)
+  // With one date, a stale end date is ignored: the event ends on its start day.
+  const single = { ...eventToForm(timed, tz), endDate: '2026-11-15' }
+  const { start, end } = formToFields(single, tz)
+  assert.equal(new Date(start).toISOString(), '2026-10-29T15:00:00.000Z')
+  assert.equal(new Date(end).toISOString(), '2026-10-29T16:30:00.000Z')
+  const day = { ...single, allDay: true }
+  assert.deepEqual([formToFields(day, tz).start, formToFields(day, tz).end], ['2026-10-29', '2026-10-30'])
+  // Overnight without the range is an error that says how to fix it.
+  assert.match(validateForm({ ...eventToForm(timed, tz), startTime: '22:00', endTime: '01:00' }, tz), /Varios días/)
+  assert.equal(validateForm({ ...eventToForm(timed, tz), multiDay: true, startTime: '22:00', endDate: '2026-10-30', endTime: '01:00' }, tz), null)
+  // Switching the range off brings the end date back to the start date.
+  const ranged = eventToForm({ ...timed, allDay: true, start: '2026-10-24', end: '2026-10-27' }, tz)
+  assert.equal(updateForm(ranged, 'multiDay', false, tz).endDate, '2026-10-24')
+  // Unchanged multi-day events still round-trip with no changes.
+  const multi = { ...timed, allDay: true, start: '2026-10-24', end: '2026-10-27' }
+  assert.deepEqual(getEventChanges(multi, eventToForm(multi, tz), tz), {})
 })

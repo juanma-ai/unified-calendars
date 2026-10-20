@@ -2551,6 +2551,11 @@ input {
   gap: 12px 16px;
 }
 
+/* A single date takes its own row, with the two times side by side below it. */
+.event-editor__when:not(.is-range) .event-editor__date {
+  grid-column: 1 / -1;
+}
+
 .event-editor__attendees {
   display: flex;
   flex-wrap: wrap;

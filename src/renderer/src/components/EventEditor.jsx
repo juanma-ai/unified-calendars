@@ -67,11 +67,19 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
           checked={form.allDay}
           onChange={set('allDay')}
         />
-        <div className="event-editor__when">
+        <ToggleControl
+          __nextHasNoMarginBottom
+          label="Varios días"
+          checked={form.multiDay}
+          onChange={set('multiDay')}
+        />
+        {/* One date by default: the end date only appears once "Varios días" is on. */}
+        <div className={`event-editor__when${form.multiDay ? ' is-range' : ''}`}>
           <TextControl
             __next40pxDefaultSize
             __nextHasNoMarginBottom
-            label="Empieza"
+            className="event-editor__date"
+            label={form.multiDay ? 'Empieza' : 'Fecha'}
             type="date"
             value={form.startDate}
             onChange={set('startDate')}
@@ -87,14 +95,17 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
               onChange={set('startTime')}
             />
           )}
-          <TextControl
-            __next40pxDefaultSize
-            __nextHasNoMarginBottom
-            label="Termina"
-            type="date"
-            value={form.endDate}
-            onChange={set('endDate')}
-          />
+          {form.multiDay && (
+            <TextControl
+              __next40pxDefaultSize
+              __nextHasNoMarginBottom
+              className="event-editor__date"
+              label="Termina"
+              type="date"
+              value={form.endDate}
+              onChange={set('endDate')}
+            />
+          )}
           {!form.allDay && (
             <TextControl
               __next40pxDefaultSize
