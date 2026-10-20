@@ -25,14 +25,26 @@ export function createInternalOidcFetch(issuer, internalUrl, request = fetch) {
   }
 }
 
+// `sub=juanma,sub=laura`: who may sign in, and which Radicale account acts for
+// them. The user name ends up inside DAV paths, so it is held to a strict shape.
+export function parseUserMap(value) {
+  const users = new Map()
+  for (const pair of String(value ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
+    const [sub, user, ...rest] = pair.split('=').map(s => s.trim())
+    if (!sub || !/^[a-z][a-z0-9_-]*$/.test(user ?? '') || rest.length || users.has(sub)) throw new Error('Invalid WEB_USER_MAP entry')
+    users.set(sub, user)
+  }
+  if (!users.size) throw new Error('WEB_USER_MAP has no family identities')
+  return users
+}
+
 export async function createAuth(env, { oidc = client, now = Date.now } = {}) {
-  for (const key of ['WEB_PUBLIC_URL', 'OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'WEB_ALLOWED_SUBJECTS']) {
+  for (const key of ['WEB_PUBLIC_URL', 'OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'WEB_USER_MAP']) {
     if (!env[key]) throw new Error(`Missing ${key}`)
   }
   const publicUrl = new URL(env.WEB_PUBLIC_URL)
   if (publicUrl.protocol !== 'https:') throw new Error('WEB_PUBLIC_URL must use HTTPS')
-  const allowed = new Set(env.WEB_ALLOWED_SUBJECTS.split(',').map(s => s.trim()).filter(Boolean))
-  if (!allowed.size) throw new Error('No allowed family identities')
+  const users = parseUserMap(env.WEB_USER_MAP)
   const transport = env.OIDC_INTERNAL_URL ? { [oidc.customFetch]: createInternalOidcFetch(env.OIDC_ISSUER, env.OIDC_INTERNAL_URL) } : undefined
   const configuration = await oidc.discovery(new URL(env.OIDC_ISSUER), env.OIDC_CLIENT_ID, env.OIDC_CLIENT_SECRET, undefined, transport)
   const pending = new Map(), sessions = new Map()
@@ -62,13 +74,14 @@ export async function createAuth(env, { oidc = client, now = Date.now } = {}) {
         })
         claims = tokens.claims()
       } catch { throw Object.assign(new Error('Login could not be verified'), { status: 401 }) }
-      if (!claims?.sub || !allowed.has(claims.sub)) throw Object.assign(new Error('This calendar is restricted to the family'), { status: 403 })
+      if (!claims?.sub || !users.has(claims.sub)) throw Object.assign(new Error('This calendar is restricted to the family'), { status: 403 })
       const session = token()
-      sessions.set(session, { sub: claims.sub, expires: now() + 12 * 3600000 })
+      sessions.set(session, { sub: claims.sub, user: users.get(claims.sub), expires: now() + 12 * 3600000 })
       res.setHeader('Set-Cookie', [cookie(SESSION_COOKIE, session, 12 * 3600), cookie(LOGIN_COOKIE, '', 0)])
       return redirect(res, attempt.returnTo)
     }
-    if (sessions.has(readCookie(req, SESSION_COOKIE))) return true
+    const current = sessions.get(readCookie(req, SESSION_COOKIE))
+    if (current) return { sub: current.sub, user: current.user }
     if (url.pathname.startsWith('/api/')) {
       res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Sign in required' })); return false
     }

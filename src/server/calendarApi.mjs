@@ -13,7 +13,10 @@ export function createCalendarApi(aggregator) {
     getSourceStatus: () => aggregator.getSourceStatus(),
     getAvailableCalendars: () => aggregator.getAvailableCalendars()
   }
-  return async (method, args) => {
+  return async (method, args, context) => {
+    // Every call acts for a signed-in family member; without one there is no
+    // Radicale account to read or write with.
+    if (typeof context?.user !== 'string' || !context.user) throw Object.assign(new Error('Sign in required'), { status: 401 })
     if (!Object.hasOwn(methods, method)) throw Object.assign(new Error('Method not available in read-only calendar'), { status: 403 })
     if (!Array.isArray(args) || args.length > 2) throw Object.assign(new Error('Invalid arguments'), { status: 400 })
     return methods[method](...args)

@@ -16,7 +16,8 @@ export function createWebServer({ auth, api = createCalendarApi(createFamilyAggr
     try {
       const url = new URL(req.url, origin)
       if (url.pathname === '/healthz' && req.method === 'GET') { res.end('ok'); return }
-      if (!(await auth(req, res, url))) return
+      const session = await auth(req, res, url)
+      if (!session) return
       if (url.pathname.startsWith('/api/')) {
         if (req.method !== 'POST') throw Object.assign(new Error('Method not allowed'), { status: 405 })
         if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) throw Object.assign(new Error('Invalid origin or content type'), { status: 403 })
@@ -27,7 +28,7 @@ export function createWebServer({ auth, api = createCalendarApi(createFamilyAggr
         }
         let args
         try { args = JSON.parse(body) } catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }) }
-        const result = await api(url.pathname.slice(5), args)
+        const result = await api(url.pathname.slice(5), args, { user: session.user })
         res.setHeader('Content-Type', 'application/json')
         res.end(JSON.stringify(result ?? null)); return
       }
