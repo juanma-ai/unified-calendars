@@ -4,6 +4,7 @@ import { AgendaView } from './components/AgendaView.jsx'
 import { AppHeader } from './components/AppHeader.jsx'
 import { CalendarGrid } from './components/CalendarGrid.jsx'
 import { CalendarSidebar } from './components/CalendarSidebar.jsx'
+import { EventEditingContext, EventEditor } from './components/EventEditor.jsx'
 import { MonthView } from './components/MonthView.jsx'
 import { SettingsScreen } from './components/SettingsScreen.jsx'
 import { SourceLegend } from './components/SourceLegend.jsx'
@@ -16,6 +17,7 @@ import { DEFAULT_TRACKER_DB_PATH, shouldShowSourceLegend } from './sourceLegend.
 import { DEFAULT_VIEW, getViewRange, isCalendarView } from './calendarViews.js'
 import { readCalendarLocation } from './calendarLocation.js'
 import { getSystemTimeZone } from './calendarTimeZones.js'
+import { eventToForm, newEventForm, saveEventForm } from './eventEditorModel.js'
 
 const POLL_INTERVAL_MS = 60 * 1000
 const VIEW_STORAGE_KEY = 'calendarView'
@@ -246,6 +248,40 @@ export function App() {
     [capabilities, editableGoogleAccounts, readOnly]
   )
 
+  // The event form exists only where the bridge declares writable sources (the
+  // family web). `editor` is null, or the event being edited (null when new)
+  // plus the form it opens with.
+  const [editor, setEditor] = useState(null)
+  const editableCalendars = useMemo(
+    () => availableCalendars.filter((calendar) => capabilities?.editableSources?.includes(calendar.source)),
+    [availableCalendars, capabilities]
+  )
+  const openEventEditor = useCallback(
+    (event) => setEditor({ event, form: eventToForm(event, preferences.timeZone) }),
+    [preferences.timeZone]
+  )
+  const openNewEvent = useCallback(
+    () => setEditor({
+      event: null,
+      form: newEventForm({ anchorDate, timeZone: preferences.timeZone, calendarId: editableCalendars[0]?.calendarId })
+    }),
+    [anchorDate, editableCalendars, preferences.timeZone]
+  )
+  const handleSaveEvent = useCallback(
+    async (form) => {
+      await saveEventForm({
+        api: window.calendarAPI, event: editor?.event, form, calendars: editableCalendars, timeZone: preferences.timeZone
+      })
+      setEditor(null)
+      await refresh()
+    },
+    [editableCalendars, editor, preferences.timeZone, refresh]
+  )
+  const eventEditing = useMemo(
+    () => (capabilities?.editableSources ? { canEditEvent, editEvent: openEventEditor } : null),
+    [canEditEvent, capabilities, openEventEditor]
+  )
+
   const handleEventTimeChange = useCallback(
     async (event, times) => {
       const previous = { start: event.start, end: event.end }
@@ -388,11 +424,13 @@ export function App() {
   }
 
   return (
+    <EventEditingContext.Provider value={eventEditing}>
     <div className="app-shell">
       <AppHeader
         anchorDate={anchorDate}
         calendarView={calendarView}
         onNavigate={setAnchorDate}
+        onNewEvent={eventEditing && editableCalendars.length ? openNewEvent : undefined}
         onOpenSettings={openSettings}
         onRefresh={handleRefreshNow}
         onViewChange={handleViewChange}
@@ -500,6 +538,17 @@ export function App() {
           </Snackbar>
         </div>
       )}
+      {editor && (
+        <EventEditor
+          event={editor.event}
+          initialForm={editor.form}
+          calendars={editableCalendars}
+          timeZone={preferences.timeZone}
+          onSave={handleSaveEvent}
+          onClose={() => setEditor(null)}
+        />
+      )}
     </div>
+    </EventEditingContext.Provider>
   )
 }

@@ -70,6 +70,7 @@ export function AppHeader({
   anchorDate,
   calendarView,
   onNavigate,
+  onNewEvent,
   onOpenSettings,
   onRefresh,
   onViewChange,
@@ -132,6 +133,12 @@ export function AppHeader({
             <ToggleGroupControlOption key={view} label={VIEW_LABELS[view]} value={view} />
           ))}
         </ToggleGroupControl>
+        {/* Only the family web passes this; Electron edits by dragging. */}
+        {onNewEvent && (
+          <Button variant="secondary" onClick={onNewEvent}>
+            Nuevo evento
+          </Button>
+        )}
         <Button variant="primary" onClick={onRefresh} disabled={refreshing}>
           {refreshing && <Spinner />}
           {refreshing ? 'Refreshing' : 'Refresh now'}
