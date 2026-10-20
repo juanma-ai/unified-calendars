@@ -1,11 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createAuth, createInternalOidcFetch } from '../src/server/auth.mjs'
-const env = { WEB_PUBLIC_URL: 'https://family.test', OIDC_ISSUER: 'https://identity.test', OIDC_CLIENT_ID: 'id', OIDC_CLIENT_SECRET: 'secret', WEB_ALLOWED_SUBJECTS: 'family-sub' }
+import { createAuth, createInternalOidcFetch, parseUserMap } from '../src/server/auth.mjs'
+const env = { WEB_PUBLIC_URL: 'https://family.test', OIDC_ISSUER: 'https://identity.test', OIDC_CLIENT_ID: 'id', OIDC_CLIENT_SECRET: 'secret', WEB_USER_MAP: 'family-sub=juanma' }
 function response() { return { headers: {}, setHeader(k, v) { this.headers[k] = v }, writeHead(status, headers) { this.status = status; Object.assign(this.headers, headers) }, end() {} } }
 test('requires configuration and HTTPS', async () => {
   await assert.rejects(createAuth({}), /Missing/)
   await assert.rejects(createAuth({ ...env, WEB_PUBLIC_URL: 'http://family.test' }), /HTTPS/)
+})
+test('user map pairs each Pocket ID subject with a path-safe Radicale user', () => {
+  assert.deepEqual([...parseUserMap(' sub-a = juanma , sub-b=laura ')], [['sub-a', 'juanma'], ['sub-b', 'laura']])
+  for (const bad of ['', 'sub-a', 'sub-a=', '=juanma', 'sub-a=../hermes', 'sub-a=Juanma', 'sub-a=juanma,sub-a=laura']) {
+    assert.throws(() => parseUserMap(bad), /WEB_USER_MAP/, bad)
+  }
 })
 test('login binds PKCE, state, nonce, family identity and expiring secure session', async () => {
   let time = 0, subject = 'family-sub', checks
@@ -23,7 +29,7 @@ test('login binds PKCE, state, nonce, family identity and expiring secure sessio
   assert.equal(checks.expectedState, 'state'); assert.equal(checks.pkceCodeVerifier, 'verifier'); assert.ok(checks.expectedNonce)
   assert.equal(callback.headers.Location, '/?view=day&date=2026-09-07')
   const sessionCookie = callback.headers['Set-Cookie'][0].split(';')[0]
-  assert.equal(await auth({ headers: { cookie: sessionCookie } }, response(), new URL('https://family.test/')), true)
+  assert.deepEqual(await auth({ headers: { cookie: sessionCookie } }, response(), new URL('https://family.test/')), { sub: 'family-sub', user: 'juanma' })
   await assert.rejects(auth({ method: 'GET', headers: { cookie: loginCookie } }, response(), new URL('https://family.test/auth/callback')), { status: 401 })
   time = 13 * 3600000
   const expired = response(); assert.equal(await auth({ headers: { cookie: sessionCookie } }, expired, new URL('https://family.test/api/getSourceStatus')), false)

@@ -7,7 +7,7 @@ Web de solo lectura de Radicale y Vikunja, reutilizando el calendario de Electro
 - Coolify: `calendario-familiar`, UUID `60lvpg1czhavu9o5gogomwpc`, proyecto Agente Familia.
 - Rama de despliegue: `feature/family-web`. La rama principal de Electron no se ha cambiado.
 - Contenedor: puerto 3000; host: `127.0.0.1:8290`; Tailscale Serve: 8450.
-- Login: Pocket ID en 8448, callback `/auth/callback`; identidades de JuanMa y Laura por `sub`.
+- Login: Pocket ID en 8448, callback `/auth/callback`; identidades de JuanMa y Laura por `sub`; `WEB_USER_MAP` (`sub=juanma,sub=laura`) dice quién entra y con qué usuario de Radicale actúa.
 - Preferencias (colores, filtros y zonas): locales a cada navegador. Eventos y tareas no se modifican.
 - Las sesiones caducan a las 12 horas; un reinicio requiere volver a iniciar sesión.
 
@@ -38,7 +38,7 @@ Los proveedores deben conservar esa red y sus alias en sus compose de Coolify.
 
 Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no admite `is_buildtime`: verificar/desactivar esa casilla tras crear variables; no basta enviar `is_build_time: false`:
 
-- `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_INTERNAL_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_ALLOWED_SUBJECTS`.
+- `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_INTERNAL_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_USER_MAP`.
 - `RADICALE_URL`, `RADICALE_USER`, `RADICALE_PASSWORD`, `RADICALE_CALENDAR_PATH`.
 - `VIKUNJA_BASE_URL`, `VIKUNJA_TOKEN`, `VIKUNJA_PROJECT_IDS=20`.
 

@@ -45,3 +45,4 @@
 
 
 - La versión web y Electron deben tener entradas, puentes y compilaciones independientes. Todo cambio compartido debe preservar y verificar el comportamiento de Electron.
+- Las pruebas que escriben en Radicale van en `juanma/personal`, nunca en `familia/casa`: Agatha lee Familia y manda resumen y avisos al grupo de Telegram.
