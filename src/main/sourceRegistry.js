@@ -1,5 +1,5 @@
 import { createSourceRangeCache } from './sourceRangeCache.js'
-import { fetchRadicaleEvents } from './sources/radicale.js'
+import { createUserRadicaleFetcher } from './sources/radicale.js'
 import { fetchVikunjaEvents } from './sources/vikunja.js'
 
 export const SOURCE_TTL_MS = {
@@ -94,16 +94,25 @@ function getStartupCache() {
 return { getUnifiedEvents, getSourceStatus, getAvailableCalendars, invalidateSourceCache, getStartupCache }
 }
 
-export function createFamilyAggregator() {
-  return createAggregator({ fetchers: {
-    radicale: fetchRadicaleEvents,
-    vikunja: async (...range) => {
-      const result = await fetchVikunjaEvents(...range)
-      // Family starts visible. Desktop's opt-in defaults remain unchanged.
-      return { ...result,
-        events: result.events.map(event => ({ ...event, raw: undefined, calendarDefaultVisible: true })),
-        calendars: (result.calendars || []).map(calendar => ({ ...calendar, calendarDefaultVisible: true }))
+// One aggregator per family member. Caches, last statuses, the calendar list
+// and the startup cache all live inside an aggregator, so sharing one would
+// hand a member's personal calendar to the next person who loads the page.
+export function createFamilyAggregator(env = process.env) {
+  const aggregators = new Map()
+  return (user) => {
+    if (!aggregators.has(user)) aggregators.set(user, createAggregator({ fetchers: {
+      radicale: createUserRadicaleFetcher({
+        baseUrl: env.RADICALE_URL, user, password: env[`RADICALE_PASSWORD_${user.toUpperCase()}`]
+      }),
+      vikunja: async (...range) => {
+        const result = await fetchVikunjaEvents(...range)
+        // Family starts visible. Desktop's opt-in defaults remain unchanged.
+        return { ...result,
+          events: result.events.map(event => ({ ...event, raw: undefined, calendarDefaultVisible: true })),
+          calendars: (result.calendars || []).map(calendar => ({ ...calendar, calendarDefaultVisible: true }))
+        }
       }
-    }
-  } })
+    } }))
+    return aggregators.get(user)
+  }
 }

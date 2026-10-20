@@ -4,10 +4,12 @@ import { createCalendarApi } from '../src/server/calendarApi.mjs'
 import { createWebServer } from '../src/server/index.mjs'
 test('API allows reads and rejects mutations, prototype methods and unbounded ranges', async () => {
   const calls = []
-  const api = createCalendarApi({ getUnifiedEvents: (...args) => { calls.push(args); return [] } })
+  const users = []
+  const api = createCalendarApi(user => { users.push(user); return { getUnifiedEvents: (...args) => { calls.push(args); return [] } } })
   const ctx = { user: 'juanma' }
   await api('getUnifiedEvents', ['2026-09-07', '2026-09-08'], ctx)
   assert.equal(calls.length, 1)
+  assert.deepEqual(users, ['juanma'])
   for (const method of ['updateEventTime', 'setReminderCompleted', 'constructor', '__proto__']) {
     await assert.rejects(api(method, [], ctx), { status: 403 })
   }
@@ -20,7 +22,7 @@ test('API allows reads and rejects mutations, prototype methods and unbounded ra
 })
 test('HTTP gates data on auth and validates origin, body and method', async t => {
   let loggedIn = false, received
-  const api = createCalendarApi({ getSourceStatus: () => [{ source: 'radicale', ok: true }] })
+  const api = createCalendarApi(() => ({ getSourceStatus: () => [{ source: 'radicale', ok: true }] }))
   const server = createWebServer({ publicUrl: 'https://family.test', auth: async (req, res) => {
     if (loggedIn) return { sub: 'family-sub', user: 'laura' }
     res.statusCode = 401; res.end(); return false

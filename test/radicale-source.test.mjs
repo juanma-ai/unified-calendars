@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { config } from '../src/main/config.js'
-import { fetchRadicaleEvents } from '../src/main/sources/radicale.js'
+import { createUserRadicaleFetcher, fetchRadicaleEvents } from '../src/main/sources/radicale.js'
 const range = ['2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z']
 const wrap = ics => `<D:multistatus xmlns:D="DAV:"><D:response><D:href>/familia/casa/a.ics</D:href><D:propstat><D:prop><C:calendar-data xmlns:C="urn:ietf:params:xml:ns:caldav"><![CDATA[${ics}]]></C:calendar-data></D:prop></D:propstat></D:response></D:multistatus>`
 function setup(t, body, status = 207) {
@@ -42,4 +42,56 @@ test('empty calendars remain visible and failures are not successful empty respo
   assert.equal(empty.statuses[0].ok, true)
   globalThis.fetch = async () => new Response('', { status: 401 })
   assert.equal((await fetchRadicaleEvents(...range)).statuses[0].ok, false)
+})
+
+// Captured from Radicale 3.8 for /juanma/ on 2026-10-20 (PROPFIND Depth 1).
+const discovery = user => `<?xml version='1.0' encoding='utf-8'?>
+<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:ICAL="http://apple.com/ns/ical/"><response><href>/${user}/</href><propstat><prop><resourcetype><principal /><collection /></resourcetype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/${user}/personal/</href><propstat><prop><resourcetype><C:calendar /><collection /></resourcetype><displayname>Mi &amp; calendario</displayname><ICAL:calendar-color>#CB30E0FF</ICAL:calendar-color><C:supported-calendar-component-set><C:comp name="VEVENT" /></C:supported-calendar-component-set></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/${user}/933EDB9E/</href><propstat><prop><resourcetype><C:calendar /><collection /></resourcetype><displayname>DEFAULT_TASK_CALENDAR_NAME</displayname><C:supported-calendar-component-set><C:comp name="VTODO" /></C:supported-calendar-component-set></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/${user}/casa/</href><propstat><prop><resourcetype><C:calendar /><collection /></resourcetype><displayname>Familia</displayname><ICAL:calendar-color>#FF8D28</ICAL:calendar-color><C:supported-calendar-component-set><C:comp name="VEVENT" /></C:supported-calendar-component-set></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>`
+const eventIn = (href, uid) => `<multistatus xmlns="DAV:"><response><href>${href}${uid}.ics</href><propstat><prop><getetag>"etag-${uid}"</getetag><C:calendar-data xmlns:C="urn:ietf:params:xml:ns:caldav">BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nSUMMARY:${uid}\r\nEND:VEVENT\r\nEND:VCALENDAR</C:calendar-data></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>`
+function davServer(t, user, { failing } = {}) {
+  const requests = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname
+    requests.push({ path, options })
+    if (options.method === 'PROPFIND') return new Response(discovery(user), { status: 207 })
+    if (path === failing) return new Response('', { status: 403 })
+    return new Response(eventIn(path, path.split('/')[2]), { status: 207 })
+  })
+  return requests
+}
+
+test('per-user source discovers the member\'s event calendars with their own credentials', async t => {
+  const requests = davServer(t, 'laura')
+  const fetchEvents = createUserRadicaleFetcher({ baseUrl: 'https://calendar.test', user: 'laura', password: 'pw' })
+  const result = await fetchEvents(...range)
+  assert.equal(requests[0].options.method, 'PROPFIND')
+  assert.equal(requests[0].path, '/laura/')
+  assert.equal(requests[0].options.headers.Depth, '1')
+  assert.equal(requests[0].options.headers.Authorization, `Basic ${Buffer.from('laura:pw').toString('base64')}`)
+  assert.deepEqual(requests.slice(1).map(r => [r.options.method, r.path]).sort(), [['REPORT', '/laura/casa/'], ['REPORT', '/laura/personal/']])
+  assert.deepEqual(result.calendars.map(c => [c.calendarId, c.calendarName, c.calendarDefaultColor, c.providerCalendarId]), [
+    ['radicale:familia', 'Familia', '#059669', '/laura/casa/'],
+    ['radicale:laura:personal', 'Mi & calendario', '#CB30E0', '/laura/personal/']
+  ])
+  const personal = result.events.find(e => e.calendarId === 'radicale:laura:personal')
+  assert.equal(personal.providerCalendarId, '/laura/personal/')
+  assert.equal(personal.providerEventId, '/laura/personal/personal.ics')
+  assert.equal(personal.etag, '"etag-personal"')
+  assert.equal(result.events.find(e => e.calendarId === 'radicale:familia').calendarName, 'Familia')
+  assert.ok(result.statuses.every(s => s.source === 'radicale' && s.ok))
+})
+
+test('per-user source keeps the calendars that answer when one fails', async t => {
+  davServer(t, 'juanma', { failing: '/juanma/personal/' })
+  const result = await createUserRadicaleFetcher({ baseUrl: 'https://calendar.test', user: 'juanma', password: 'pw' })(...range)
+  assert.deepEqual(result.events.map(e => e.calendarId), ['radicale:familia'])
+  assert.equal(result.calendars.length, 2)
+  assert.deepEqual(result.statuses.map(s => s.ok).sort(), [false, true])
+})
+
+test('per-user source without a password reports not-connected and makes no request', async t => {
+  const requests = davServer(t, 'laura')
+  const result = await createUserRadicaleFetcher({ baseUrl: 'https://calendar.test', user: 'laura' })(...range)
+  assert.equal(requests.length, 0)
+  assert.deepEqual(result.statuses, [{ source: 'radicale', ok: false, lastError: 'not-connected' }])
 })

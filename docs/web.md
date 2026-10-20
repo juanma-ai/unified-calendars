@@ -39,11 +39,11 @@ Los proveedores deben conservar esa red y sus alias en sus compose de Coolify.
 Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no admite `is_buildtime`: verificar/desactivar esa casilla tras crear variables; no basta enviar `is_build_time: false`:
 
 - `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_INTERNAL_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_USER_MAP`.
-- `RADICALE_URL`, `RADICALE_USER`, `RADICALE_PASSWORD`, `RADICALE_CALENDAR_PATH`.
+- `RADICALE_URL`, y una `RADICALE_PASSWORD_<USUARIO>` por cada usuario de `WEB_USER_MAP` (`RADICALE_PASSWORD_JUANMA`, `RADICALE_PASSWORD_LAURA`).
 - `VIKUNJA_BASE_URL`, `VIKUNJA_TOKEN`, `VIKUNJA_PROJECT_IDS=20`.
 
 Cuenta de Vikunja: `calendar-web`, permiso de lectura sobre Family. Token restringido a lectura de proyectos y tareas; caduca el 1 de enero de 2036. El filtro por proyecto no reemplaza los permisos del usuario.
-Radicale utiliza la identidad `hermes`, acotada al calendario familiar. El servidor HTTP solo expone consultas; no existe ruta de escritura DAV.
+Radicale se lee con la cuenta de quien ha entrado: `PROPFIND /<usuario>/` descubre sus calendarios de eventos (Familia por el enlace `casa` y el personal; el de tareas VTODO del iPhone se ignora). Así el fichero de derechos de Radicale impide que uno vea el personal del otro. Cada usuario tiene su propio agregador y su propia caché. El servidor HTTP solo expone consultas; no existe ruta de escritura DAV.
 
 Se han configurado los submódulos y el webhook de GitHub en Coolify.
 **Cada push despliega por webhook. No lanzar además un despliegue por API.**
