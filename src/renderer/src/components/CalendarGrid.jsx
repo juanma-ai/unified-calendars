@@ -171,6 +171,10 @@ export function CalendarGrid({
   const beginDrag = useCallback(
     (event, mode) => (pointerEvent) => {
       if (pointerEvent.button !== 0 || !canEditEvent(event)) return
+      // A finger on a pill is usually the start of a scroll: the browser pans,
+      // cancels the pointer, and the lost capture would commit whatever the first
+      // few moves computed. Touch edits go through the event form instead.
+      if (pointerEvent.pointerType === 'touch') return
       // Resize handles sit inside the pill wrapper, whose pointerdown starts a move.
       if (mode !== 'move') pointerEvent.stopPropagation()
 
@@ -193,7 +197,9 @@ export function CalendarGrid({
         dayWidth: column?.getBoundingClientRect().width ?? 0,
         times: null
       }
-      wrapper?.setPointerCapture(pointerEvent.pointerId)
+      // No pointer capture yet: while the pointer is captured, Chromium sends the
+      // click to the capturing wrapper instead of the pill, so a plain click would
+      // never open the event's menu. handleDragMove captures once it is a drag.
     },
     [canEditEvent]
   )
@@ -201,10 +207,17 @@ export function CalendarGrid({
   const handleDragMove = useCallback((pointerEvent) => {
     const state = dragRef.current
     if (!state) return
+    // The button came up outside the pill before it became a drag, so no
+    // pointerup reached us; a later hover must not resume it.
+    if (pointerEvent.buttons === 0) {
+      dragRef.current = null
+      return
+    }
 
     const deltaX = pointerEvent.clientX - state.originX
     const deltaY = pointerEvent.clientY - state.originY
     if (!state.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) return
+    if (!state.moved) pointerEvent.currentTarget.setPointerCapture?.(pointerEvent.pointerId)
     state.moved = true
 
     const { event, mode } = state
