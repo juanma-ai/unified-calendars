@@ -113,3 +113,23 @@ export async function saveEventForm({ api, event, form, calendars, timeZone }) {
   }
   if (moves) await api.moveEventToCalendar({ event: current, calendarPath })
 }
+
+// Applies one field change. Moving the start drags the end along so the event
+// keeps its length, as the iPhone does; an end left empty comes back level
+// with the new start instead of blocking the save.
+export function updateForm(form, key, value, timeZone) {
+  const next = { ...form, [key]: value }
+  if ((key !== 'startDate' && key !== 'startTime') || !value || !DATE_ONLY.test(next.startDate)) return next
+  if (form.allDay) {
+    const days = DATE_ONLY.test(form.endDate) && DATE_ONLY.test(form.startDate)
+      ? Math.max(0, Math.round((civilDate(form.endDate) - civilDate(form.startDate)) / 86400000))
+      : 0
+    return { ...next, endDate: formatCivil(addDays(civilDate(next.startDate), days)) }
+  }
+  if (!/^\d{2}:\d{2}$/.test(next.startTime)) return next
+  const complete = [form.startDate, form.endDate].every(d => DATE_ONLY.test(d)) && [form.startTime, form.endTime].every(t => /^\d{2}:\d{2}$/.test(t))
+  const before = complete ? formTimes(form, timeZone) : null
+  const duration = before ? Math.max(0, Date.parse(before.end) - Date.parse(before.start)) : 3600000
+  const end = zonedParts(Date.parse(toInstant(next.startDate, next.startTime, timeZone)) + duration, timeZone)
+  return { ...next, endDate: end.date, endTime: end.time }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { eventToForm, formToFields, getEventChanges, newEventForm, saveEventForm, validateForm } from '../src/renderer/src/eventEditorModel.js'
+import { eventToForm, formToFields, getEventChanges, newEventForm, saveEventForm, updateForm, validateForm } from '../src/renderer/src/eventEditorModel.js'
 const tz = 'Europe/Madrid'
 const timed = {
   title: 'Dentista', calendarId: 'radicale:familia', allDay: false, location: 'Centro', description: '',
@@ -86,4 +86,20 @@ test('saving creates, updates and moves in that order, with the etag from the up
   await assert.rejects(saveEventForm({ api, event: occurrence, form: { ...eventToForm(occurrence, tz), title: 'Cambio', calendarId: 'radicale:juanma:personal' }, calendars, timeZone: tz }), /serie/)
   await assert.rejects(saveEventForm({ api, event: null, form: { ...eventToForm(timed, tz), calendarId: 'radicale:gone' }, calendars, timeZone: tz }), /Recarga/)
   assert.deepEqual(calls, [])
+})
+test('moving the start drags the end with it, keeping the duration', () => {
+  const form = eventToForm(timed, tz) // 29 Oct 16:00-17:30
+  const later = updateForm(form, 'startDate', '2026-11-03', tz)
+  assert.deepEqual([later.startDate, later.startTime, later.endDate, later.endTime], ['2026-11-03', '16:00', '2026-11-03', '17:30'])
+  const earlier = updateForm(form, 'startTime', '09:15', tz)
+  assert.deepEqual([earlier.endDate, earlier.endTime], ['2026-10-29', '10:45'])
+  const allDay = { ...form, allDay: true, startDate: '2026-10-24', endDate: '2026-10-26' }
+  assert.deepEqual([updateForm(allDay, 'startDate', '2026-10-30', tz).endDate], ['2026-11-01'])
+  // An end that was already missing comes back instead of staying empty.
+  const noEnd = { ...form, allDay: true, endDate: '' }
+  assert.equal(updateForm(noEnd, 'startDate', '2026-10-22', tz).endDate, '2026-10-22')
+  // Other fields, and clearing the start, change only themselves.
+  assert.equal(updateForm(form, 'endTime', '19:00', tz).startTime, '16:00')
+  assert.deepEqual(updateForm(form, 'startDate', '', tz), { ...form, startDate: '' })
+  assert.deepEqual(updateForm(form, 'title', 'x', tz), { ...form, title: 'x' })
 })

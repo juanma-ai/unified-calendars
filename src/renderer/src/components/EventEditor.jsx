@@ -10,7 +10,7 @@ import {
   ToggleControl
 } from '@wordpress/components'
 import { createContext, useContext, useState } from 'react'
-import { EDITOR_ATTENDEES, validateForm } from '../eventEditorModel.js'
+import { EDITOR_ATTENDEES, updateForm, validateForm } from '../eventEditorModel.js'
 
 // Provided only by the family web, which is the one surface that writes
 // events through a form. EventPill reads it to offer "Editar"; without a
@@ -22,7 +22,7 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
-  const set = (key) => (value) => setForm((current) => ({ ...current, [key]: value }))
+  const set = (key) => (value) => setForm((current) => updateForm(current, key, value, timeZone))
   // A whole file moves between calendars, so one occurrence cannot.
   const lockedCalendar = Boolean(event?.recurrenceId)
 
