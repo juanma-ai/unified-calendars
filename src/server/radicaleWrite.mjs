@@ -171,6 +171,10 @@ function singleEvent(vcalendar) {
   return event
 }
 
+export function createFamilyWriter(env = process.env) {
+  return user => createRadicaleWriter({ baseUrl: env.RADICALE_URL, user, password: env[`RADICALE_PASSWORD_${user.toUpperCase()}`] })
+}
+
 // Writes for one signed-in member, with their own Radicale account. The rights
 // file is the real boundary; on top of it, every path must belong to a calendar
 // this member's PROPFIND returns right now, never one the browser names.

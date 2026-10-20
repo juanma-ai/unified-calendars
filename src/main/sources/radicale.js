@@ -28,6 +28,9 @@ async function reportEvents({ baseUrl, authorization, calendar, calendarPath, ra
       id: `radicale:${event.uid}:${event.recurrenceId || event.start.toISOString()}`,
       providerCalendarId: calendarPath, providerEventId: row.href, etag: row.etag,
       seriesId: `radicale:${event.uid}`,
+      // The occurrence's original start as the expanded REPORT gives it (UTC, or
+      // a date for all-day series); writes need it to address one occurrence.
+      recurrenceId: event.recurrenceId || null,
       title: event.summary || '(Sin título)', description: event.description || '',
       location: event.location || '',
       start: event.allDay ? civilDate(event.start) : event.start.toISOString(),
