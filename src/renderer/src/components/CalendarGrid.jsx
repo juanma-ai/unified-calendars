@@ -171,6 +171,10 @@ export function CalendarGrid({
   const beginDrag = useCallback(
     (event, mode) => (pointerEvent) => {
       if (pointerEvent.button !== 0 || !canEditEvent(event)) return
+      // A finger on a pill is usually the start of a scroll: the browser pans,
+      // cancels the pointer, and the lost capture would commit whatever the first
+      // few moves computed. Touch edits go through the event form instead.
+      if (pointerEvent.pointerType === 'touch') return
       // Resize handles sit inside the pill wrapper, whose pointerdown starts a move.
       if (mode !== 'move') pointerEvent.stopPropagation()
 

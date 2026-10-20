@@ -235,11 +235,15 @@ export function App() {
   const canEditEvent = useCallback(
     (event) => {
       // Events restored from the on-disk cache predate provider ids; a refresh fixes them.
-      if (readOnly || !event.providerEventId) return false
+      if (!event.providerEventId) return false
+      // The family web declares which sources it writes; Electron declares none
+      // and keeps its own rules below.
+      if (capabilities?.editableSources) return capabilities.editableSources.includes(event.source)
+      if (readOnly) return false
       if (event.source === 'google') return editableGoogleAccounts.has(event.sourceAccountId)
       return event.source === 'trello' || event.source === 'reminders'
     },
-    [editableGoogleAccounts, readOnly]
+    [capabilities, editableGoogleAccounts, readOnly]
   )
 
   const handleEventTimeChange = useCallback(
