@@ -1,5 +1,5 @@
 import { createSourceRangeCache } from './sourceRangeCache.js'
-import { createUserRadicaleFetcher } from './sources/radicale.js'
+import { createPeerRadicaleFetcher, createUserRadicaleFetcher } from './sources/radicale.js'
 import { fetchVikunjaEvents } from './sources/vikunja.js'
 
 export const SOURCE_TTL_MS = {
@@ -97,13 +97,34 @@ return { getUnifiedEvents, getSourceStatus, getAvailableCalendars, invalidateSou
 // One aggregator per family member. Caches, last statuses, the calendar list
 // and the startup cache all live inside an aggregator, so sharing one would
 // hand a member's personal calendar to the next person who loads the page.
+const familyMembers = (env) => Object.keys(env)
+  .map((key) => /^RADICALE_PASSWORD_([A-Z][A-Z0-9_-]*)$/.exec(key)?.[1].toLowerCase())
+  .filter(Boolean)
+
+function combineFetchers(fetchers) {
+  return async (...range) => {
+    const results = await Promise.all(fetchers.map((fetch) => fetch(...range)))
+    return {
+      events: results.flatMap((result) => result.events),
+      calendars: results.flatMap((result) => result.calendars ?? []),
+      statuses: results.flatMap((result) => result.statuses)
+    }
+  }
+}
+
 export function createFamilyAggregator(env = process.env) {
   const aggregators = new Map()
   return (user) => {
     if (!aggregators.has(user)) aggregators.set(user, createAggregator({ fetchers: {
-      radicale: createUserRadicaleFetcher({
-        baseUrl: env.RADICALE_URL, user, password: env[`RADICALE_PASSWORD_${user.toUpperCase()}`]
-      }),
+      radicale: combineFetchers([
+        createUserRadicaleFetcher({
+          baseUrl: env.RADICALE_URL, user, password: env[`RADICALE_PASSWORD_${user.toUpperCase()}`]
+        }),
+        // Every other member with a Radicale password shows up read-only.
+        ...familyMembers(env).filter((peer) => peer !== user).map((peer) => createPeerRadicaleFetcher({
+          baseUrl: env.RADICALE_URL, peer, password: env[`RADICALE_PASSWORD_${peer.toUpperCase()}`]
+        }))
+      ]),
       vikunja: async (...range) => {
         const result = await fetchVikunjaEvents(...range)
         // Family starts visible. Desktop's opt-in defaults remain unchanged.

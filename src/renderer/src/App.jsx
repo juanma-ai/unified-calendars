@@ -238,6 +238,8 @@ export function App() {
     (event) => {
       // Events restored from the on-disk cache predate provider ids; a refresh fixes them.
       if (!event.providerEventId) return false
+      // The other family member's calendar: shown, never written.
+      if (event.readOnly) return false
       // The family web declares which sources it writes; Electron declares none
       // and keeps its own rules below.
       if (capabilities?.editableSources) return capabilities.editableSources.includes(event.source)
@@ -253,7 +255,7 @@ export function App() {
   // plus the form it opens with.
   const [editor, setEditor] = useState(null)
   const editableCalendars = useMemo(
-    () => availableCalendars.filter((calendar) => capabilities?.editableSources?.includes(calendar.source)),
+    () => availableCalendars.filter((calendar) => !calendar.readOnly && capabilities?.editableSources?.includes(calendar.source)),
     [availableCalendars, capabilities]
   )
   const openEventEditor = useCallback(
