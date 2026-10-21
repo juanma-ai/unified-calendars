@@ -3,7 +3,7 @@ import { createCalendarPreferencesStore } from '../../shared/calendarPreferences
 // readOnly still switches off the desktop-only actions (reminders, time
 // tracker); editableSources is what lets Radicale events be dragged here.
 export const FAMILY_CAPABILITIES = Object.freeze({ sources: ['radicale', 'vikunja'], readOnly: true, editableSources: Object.freeze(['radicale']), desktop: false })
-const WRITE_METHODS = ['updateEventTime', 'createEvent', 'updateEvent', 'moveEventToCalendar']
+const WRITE_METHODS = ['updateEventTime', 'createEvent', 'updateEvent', 'moveEventToCalendar', 'deleteEvent']
 const READ_METHODS = ['getUnifiedEvents', 'refreshNow', 'getCachedEvents', 'getSourceStatus', 'getAvailableCalendars']
 const PREFERENCE_METHODS = ['setCalendarColor', 'setCalendarSidebarVisibility', 'setCalendarVisibility', 'toggleFocusedCalendar', 'setSourceEnabled', 'setTimeZone', 'setTimeZoneCity', 'setSecondaryTimeZones', 'setSecondaryTimeZoneNote', 'hideEvent', 'restoreHiddenEvent']
 

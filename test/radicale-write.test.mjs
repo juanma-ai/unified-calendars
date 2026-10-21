@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRadicaleWriter } from '../src/server/radicaleWrite.mjs'
+import ICAL from 'ical.js'
 import { parseCalendar } from '../vendor/casa-agent/src/radicale.mjs'
 
 // Both written by an iPhone and read straight off Radicale's storage.
@@ -32,6 +33,11 @@ function fakeRadicale(t, files = { [SERIES]: series, [SINGLE]: single }) {
       const etag = `"${path.length}-${++version}"`
       store.set(path, { ics: init.body, etag })
       return new Response(null, { status: file ? 204 : 201, headers: { ETag: etag } })
+    }
+    if (init.method === 'DELETE') {
+      if (!file) return new Response('', { status: 404 })
+      store.delete(path)
+      return new Response(null, { status: 204 })
     }
     if (init.method === 'MOVE') {
       const destination = new URL(init.headers.Destination).pathname
@@ -189,4 +195,80 @@ test('a standalone event moves between calendars; a series never does', async t 
   await assert.rejects(writer.moveEventToCalendar({ event: { providerEventId: '/juanma/personal/26AAC2DE.ics', etag: '"x"' }, calendarPath: '/laura/personal/' }), { status: 409 })
   const moved = { providerEventId: '/juanma/personal/26AAC2DE.ics', etag: store.get('/juanma/personal/26AAC2DE.ics').etag }
   await assert.rejects(writer.moveEventToCalendar({ event: moved, calendarPath: '/laura/personal/' }), { status: 403 })
+})
+
+test('deleting one occurrence adds an EXDATE in the series zone and leaves the rest', async t => {
+  const { writer, store, etagOf } = fakeRadicale(t)
+  const event = { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }
+  const result = await writer.deleteEvent({ event, scope: 'occurrence' })
+  assert.equal(result.etag, etagOf(SERIES))
+  const ics = store.get(SERIES).ics
+  const [master] = vevents(ics)
+  assert.match(master, /EXDATE;TZID=Europe\/Madrid:20261029T100000/, '10:00 Madrid = 09:00Z')
+  assert.match(master, /RRULE:FREQ=WEEKLY/)
+  assert.match(master, /TRIGGER:-PT15M/)
+  assert.ok(exceptionFor(ics, '20261112T100000'), 'the iPhone exception is untouched')
+  // Expanded the way Radicale's REPORT does, the 29th is gone and the 5th is not.
+  const vcalendar = new ICAL.Component(ICAL.parse(ics))
+  for (const zone of vcalendar.getAllSubcomponents('vtimezone')) ICAL.TimezoneService.register(new ICAL.Timezone(zone))
+  const iterator = new ICAL.Event(vcalendar.getFirstSubcomponent('vevent')).iterator()
+  const starts = Array.from({ length: 4 }, () => iterator.next().toJSDate().toISOString())
+  assert.deepEqual(starts, ['2026-10-22T08:00:00.000Z', '2026-11-05T09:00:00.000Z', '2026-11-12T09:00:00.000Z', '2026-11-19T09:00:00.000Z'])
+})
+
+test('deleting an occurrence the iPhone had split removes its exception too', async t => {
+  const { writer, store, etagOf } = fakeRadicale(t)
+  const event = { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261112T090000Z' }
+  await writer.deleteEvent({ event, scope: 'occurrence' })
+  const ics = store.get(SERIES).ics
+  assert.equal(vevents(ics).length, 1)
+  assert.match(vevents(ics)[0], /EXDATE;TZID=Europe\/Madrid:20261112T100000/)
+})
+
+test('deleting the whole series removes its file; a standalone event needs no scope', async t => {
+  const { writer, store, etagOf, requests } = fakeRadicale(t)
+  await writer.deleteEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }, scope: 'series' })
+  assert.equal(store.has(SERIES), false)
+  await writer.deleteEvent({ event: { providerEventId: SINGLE, etag: etagOf(SINGLE) } })
+  assert.equal(store.has(SINGLE), false)
+  const deletes = requests.filter(r => r.method === 'DELETE')
+  assert.deepEqual(deletes.map(r => [r.path, Boolean(r.headers['If-Match'])]), [[SERIES, true], [SINGLE, true]])
+})
+
+test('deleting refuses a missing scope, a stale etag, foreign paths and mixed files', async t => {
+  const { writer, store, etagOf } = fakeRadicale(t)
+  const occurrence = { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }
+  await assert.rejects(writer.deleteEvent({ event: occurrence }), { status: 400 })
+  await assert.rejects(writer.deleteEvent({ event: occurrence, scope: 'all' }), { status: 400 })
+  await assert.rejects(writer.deleteEvent({ event: { ...occurrence, etag: '"old"' }, scope: 'series' }), { status: 409 })
+  await assert.rejects(writer.deleteEvent({ event: { providerEventId: '/laura/personal/x.ics', etag: '"1"' } }), { status: 403 })
+  // A series addressed without its occurrence is not a standalone event.
+  await assert.rejects(writer.deleteEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES) } }), { status: 400 })
+  assert.equal(store.has(SERIES), true)
+
+  const mixed = single.replace('END:VCALENDAR', single.slice(single.indexOf('BEGIN:VEVENT'), single.indexOf('END:VEVENT') + 10).replace(/^UID:.*$/m, 'UID:OTHER') + '\r\nEND:VCALENDAR')
+  const other = fakeRadicale(t, { [SERIES]: mixed.replace(/END:VEVENT/, 'RRULE:FREQ=WEEKLY\r\nEND:VEVENT') })
+  const mixedEvent = { providerEventId: SERIES, etag: other.etagOf(SERIES), recurrenceId: '20260907T060000Z' }
+  await assert.rejects(other.writer.deleteEvent({ event: mixedEvent, scope: 'series' }), { status: 400, code: 'invalid-event', message: /more than one event/ })
+  assert.equal(other.store.has(SERIES), true)
+})
+
+test('a DELETE that loses the race is a conflict', async t => {
+  const { writer, store, etagOf } = fakeRadicale(t)
+  const event = { providerEventId: SINGLE, etag: etagOf(SINGLE) }
+  const realGet = store.get.bind(store)
+  // The GET sees the client's etag; someone saves before the DELETE lands.
+  let reads = 0
+  store.get = path => {
+    const file = realGet(path)
+    return ++reads > 1 && file ? { ...file, etag: '"changed"' } : file
+  }
+  await assert.rejects(writer.deleteEvent({ event }), { status: 409 })
+})
+
+test('an all-day series gets a date-valued EXDATE', async t => {
+  const allDay = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//ES\r\nBEGIN:VEVENT\r\nUID:AD\r\nDTSTAMP:20261001T000000Z\r\nDTSTART;VALUE=DATE:20261024\r\nDTEND;VALUE=DATE:20261025\r\nRRULE:FREQ=WEEKLY\r\nSUMMARY:Mercado\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+  const { writer, store, etagOf } = fakeRadicale(t, { [SERIES]: allDay })
+  await writer.deleteEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261031' }, scope: 'occurrence' })
+  assert.match(store.get(SERIES).ics, /EXDATE;VALUE=DATE:20261031\r\n/)
 })

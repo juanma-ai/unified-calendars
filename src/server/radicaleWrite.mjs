@@ -133,23 +133,9 @@ const sameOccurrence = (a, b) => a.isDate || b.isDate
 // the series so it keeps the alarms and X-APPLE-* lines, and its RECURRENCE-ID
 // uses the series' own TZID, which is what the iPhone matches on.
 function occurrenceEvent(vcalendar, recurrenceId) {
-  const vevents = vcalendar.getAllSubcomponents('vevent')
-  const master = vevents.map(c => new ICAL.Event(c)).find(e => !e.isRecurrenceException())
-  if (!master) throw fail(404, 'Series not found', 'not-found')
-  const target = parseRecurrenceId(recurrenceId)
-  const existing = vevents.map(c => new ICAL.Event(c))
-    .find(e => e.isRecurrenceException() && sameOccurrence(e.recurrenceId, target))
+  const { master, target, existing } = seriesParts(vcalendar, recurrenceId)
   if (existing) return existing
-  if (!master.isRecurring()) throw fail(400, 'Event is not part of a series', 'invalid-event')
-
-  const iterator = master.iterator()
-  let occurrence
-  for (let i = 0; i < 10000 && (occurrence = iterator.next()); i++) {
-    if (sameOccurrence(occurrence, target)) break
-    if (!occurrence.isDate && !target.isDate && occurrence.toUnixTime() > target.toUnixTime()) { occurrence = null; break }
-    if (occurrence.isDate && occurrence.compare(target) > 0) { occurrence = null; break }
-  }
-  if (!occurrence || !sameOccurrence(occurrence, target)) throw fail(404, 'Occurrence not found in series', 'not-found')
+  const occurrence = findOccurrence(master, target)
 
   const component = new ICAL.Component(structuredClone(master.component.toJSON()))
   for (const name of ['rrule', 'rdate', 'exdate', 'recurrence-id']) component.removeAllProperties(name)
@@ -161,6 +147,47 @@ function occurrenceEvent(vcalendar, recurrenceId) {
   exception.endDate = endDate.clone()
   vcalendar.addSubcomponent(component)
   return exception
+}
+
+// The series, the occurrence the REPORT named and its exception, if any.
+function seriesParts(vcalendar, recurrenceId) {
+  const vevents = vcalendar.getAllSubcomponents('vevent').map(c => new ICAL.Event(c))
+  const master = vevents.find(e => !e.isRecurrenceException())
+  if (!master) throw fail(404, 'Series not found', 'not-found')
+  const target = parseRecurrenceId(recurrenceId)
+  const existing = vevents.find(e => e.isRecurrenceException() && sameOccurrence(e.recurrenceId, target))
+  return { master, target, existing }
+}
+
+// The occurrence's original start in the series' own zone and value type,
+// which is how the iPhone matches a RECURRENCE-ID or an EXDATE.
+function findOccurrence(master, target) {
+  if (!master.isRecurring()) throw fail(400, 'Event is not part of a series', 'invalid-event')
+  const iterator = master.iterator()
+  let occurrence
+  for (let i = 0; i < 10000 && (occurrence = iterator.next()); i++) {
+    if (sameOccurrence(occurrence, target)) break
+    if (!occurrence.isDate && !target.isDate && occurrence.toUnixTime() > target.toUnixTime()) { occurrence = null; break }
+    if (occurrence.isDate && occurrence.compare(target) > 0) { occurrence = null; break }
+  }
+  if (!occurrence || !sameOccurrence(occurrence, target)) throw fail(404, 'Occurrence not found in series', 'not-found')
+  return occurrence
+}
+
+// Drops one occurrence: an EXDATE on the series and, if the iPhone or the web
+// had already split it off, its RECURRENCE-ID exception too.
+function excludeOccurrence(vcalendar, recurrenceId) {
+  const { master, target, existing } = seriesParts(vcalendar, recurrenceId)
+  const occurrence = findOccurrence(master, target)
+  if (existing) vcalendar.removeSubcomponent(existing.component)
+  const exdate = new ICAL.Property('exdate')
+  exdate.resetType(occurrence.isDate ? 'date' : 'date-time')
+  exdate.setValue(occurrence.clone())
+  if (!occurrence.isDate && occurrence.zone?.tzid && !['UTC', 'floating'].includes(occurrence.zone.tzid)) {
+    exdate.setParameter('tzid', occurrence.zone.tzid)
+  }
+  master.component.addProperty(exdate)
+  return master
 }
 
 function singleEvent(vcalendar) {
@@ -243,6 +270,14 @@ export function createRadicaleWriter({ baseUrl, user, password, fetch = globalTh
     return save(event.providerEventId, vcalendar, { 'If-Match': event.etag })
   }
 
+  async function remove(href, etag) {
+    const response = await request(href, { method: 'DELETE', headers: { 'If-Match': etag } })
+    if (response.status === 412) throw conflict()
+    if (response.status === 404) throw fail(404, 'Event not found', 'not-found')
+    if (response.status !== 200 && response.status !== 204) throw fail(502, `Radicale request failed: ${response.status}`)
+    return { providerEventId: null, etag: null }
+  }
+
   return {
     async createEvent({ calendarPath, ...fields }) {
       assertCalendar(await calendarPaths(), calendarPath)
@@ -269,6 +304,27 @@ export function createRadicaleWriter({ baseUrl, user, password, fetch = globalTh
     updateEvent,
 
     updateEventTime: ({ event, start, end }) => updateEvent({ event, changes: { start, end } }),
+
+    // A standalone event goes with its file. In a series, `scope` says whether
+    // only this occurrence goes (an EXDATE, the file stays) or the whole file,
+    // exceptions included; the web asks which, so there is no default.
+    async deleteEvent({ event, scope }) {
+      const { vcalendar } = await load(event)
+      if (!event.recurrenceId) {
+        singleEvent(vcalendar)
+        return remove(event.providerEventId, event.etag)
+      }
+      if (scope === 'occurrence') {
+        const master = excludeOccurrence(vcalendar, event.recurrenceId)
+        stamp(master.component, now())
+        return save(event.providerEventId, vcalendar, { 'If-Match': event.etag })
+      }
+      if (scope !== 'series') throw fail(400, 'Choose this occurrence or the whole series', 'invalid-field')
+      // One file, one series: never take an unrelated event along with it.
+      const uids = new Set(vcalendar.getAllSubcomponents('vevent').map(c => c.getFirstPropertyValue('uid')))
+      if (uids.size !== 1) throw fail(400, 'File holds more than one event', 'invalid-event')
+      return remove(event.providerEventId, event.etag)
+    },
 
     // A whole file moves, so only a standalone event can: moving one
     // occurrence would take the rest of its series along.
