@@ -8,6 +8,10 @@ import { parseCalendarCollections } from '../main/sources/radicale.js'
 // everything after the first name once the iPhone saves it.
 export const ATTENDEES = ['JuanMa', 'Laura']
 const ATTENDEE_PROP = 'x-familia-asistente'
+// Hides the event from the other member in the web and from Hermes. Only a
+// personal calendar can hold it: Familia is shared on both iPhones anyway.
+const PRIVATE_PROP = 'x-familia-privado'
+const isFamilyCalendar = path => /\/casa\/$/.test(path)
 const DEFAULT_TZID = 'Europe/Madrid'
 
 // Copied from an event the iPhone wrote (vendor/casa-agent/test/fixtures).
@@ -95,6 +99,21 @@ function setAttendees(component, attendees) {
   for (const name of ATTENDEES.filter(name => attendees.includes(name))) component.addPropertyWithValue(ATTENDEE_PROP, name)
 }
 
+// The whole file at once: a series with its exceptions is one event to the
+// people looking at it, and a private master must not leak through an exception.
+function setPrivate(vcalendar, value, calendarPath) {
+  if (value === undefined) return
+  if (typeof value !== 'boolean') throw fail(400, 'private must be true or false', 'invalid-field')
+  if (value && isFamilyCalendar(calendarPath)) throw fail(400, 'Familia events cannot be private', 'invalid-field')
+  for (const component of vcalendar.getAllSubcomponents('vevent')) {
+    if (value) component.updatePropertyWithValue(PRIVATE_PROP, 'TRUE')
+    else component.removeAllProperties(PRIVATE_PROP)
+  }
+}
+
+const isPrivate = vcalendar => vcalendar.getAllSubcomponents('vevent')
+  .some(component => String(component.getFirstPropertyValue(PRIVATE_PROP)).toUpperCase() === 'TRUE')
+
 function applyChanges(event, vcalendar, changes) {
   if (changes.start !== undefined || changes.end !== undefined) setTimes(event, vcalendar, changes.start, changes.end)
   if (changes.title !== undefined && (typeof changes.title !== 'string' || !changes.title.trim())) {
@@ -157,6 +176,13 @@ function seriesParts(vcalendar, recurrenceId) {
   const target = parseRecurrenceId(recurrenceId)
   const existing = vevents.find(e => e.isRecurrenceException() && sameOccurrence(e.recurrenceId, target))
   return { master, target, existing }
+}
+
+// The series an occurrence belongs to, after checking the occurrence exists.
+function seriesMaster(vcalendar, recurrenceId) {
+  const { master, target, existing } = seriesParts(vcalendar, recurrenceId)
+  if (!existing) findOccurrence(master, target)
+  return master
 }
 
 // The occurrence's original start in the series' own zone and value type,
@@ -263,9 +289,15 @@ export function createRadicaleWriter({ baseUrl, user, password, fetch = globalTh
 
   async function updateEvent({ event, changes }) {
     if (!changes || typeof changes !== 'object') throw fail(400, 'Missing changes', 'invalid-field')
-    const { vcalendar } = await load(event)
-    const target = event.recurrenceId ? occurrenceEvent(vcalendar, event.recurrenceId) : singleEvent(vcalendar)
-    applyChanges(target, vcalendar, changes)
+    const { calendarPath, vcalendar } = await load(event)
+    const { private: privateChange, ...fields } = changes
+    // Marking an occurrence private marks its series; only a real change to the
+    // occurrence itself is worth a RECURRENCE-ID exception.
+    const onlyPrivate = event.recurrenceId && privateChange !== undefined && !Object.keys(fields).length
+    const target = onlyPrivate ? seriesMaster(vcalendar, event.recurrenceId)
+      : event.recurrenceId ? occurrenceEvent(vcalendar, event.recurrenceId) : singleEvent(vcalendar)
+    applyChanges(target, vcalendar, fields)
+    setPrivate(vcalendar, privateChange, calendarPath)
     stamp(target.component, now())
     return save(event.providerEventId, vcalendar, { 'If-Match': event.etag })
   }
@@ -295,6 +327,7 @@ export function createRadicaleWriter({ baseUrl, user, password, fetch = globalTh
       if (fields.title === undefined) throw fail(400, 'title is required', 'invalid-field')
       if (fields.start === undefined || fields.end === undefined) throw fail(400, 'start and end are required', 'invalid-time')
       applyChanges(event, vcalendar, fields)
+      setPrivate(vcalendar, fields.private, calendarPath)
       stamp(component, now(), { bumpSequence: false })
       component.updatePropertyWithValue('sequence', 0)
       // If-None-Match: * turns a clashing UID into a 412 instead of an overwrite.
@@ -334,6 +367,7 @@ export function createRadicaleWriter({ baseUrl, user, password, fetch = globalTh
       singleEvent(vcalendar)
       assertCalendar(paths, calendarPath)
       if (calendarPath === from) throw fail(400, 'Event is already in that calendar', 'invalid-field')
+      if (isFamilyCalendar(calendarPath) && isPrivate(vcalendar)) throw fail(400, 'Familia events cannot be private', 'invalid-field')
       const destination = `${calendarPath}${name}`
       const response = await request(event.providerEventId, {
         method: 'MOVE',

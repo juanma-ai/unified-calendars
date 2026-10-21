@@ -45,6 +45,8 @@ Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no ad
 Cuenta de Vikunja: `calendar-web`, permiso de lectura sobre Family. Token restringido a lectura de proyectos y tareas; caduca el 1 de enero de 2036. El filtro por proyecto no reemplaza los permisos del usuario.
 Radicale se lee con la cuenta de quien ha entrado: `PROPFIND /<usuario>/` descubre sus calendarios de eventos (Familia por el enlace `casa` y el personal; el de tareas VTODO del iPhone se ignora). Así el fichero de derechos de Radicale impide que uno vea el personal del otro. Cada usuario tiene su propio agregador y su propia caché.
 
+El `personal` del otro miembro también se ve, en solo lectura: el servidor lo lee con la cuenta de Radicale del otro (`RADICALE_PASSWORD_<OTRO>`), nunca abriendo el fichero de derechos, y quita ahí los eventos privados antes de cachearlos. Sale con `readOnly`, así que la web no ofrece editarlo; y aunque el navegador lo intentara, el escritor solo acepta rutas del PROPFIND propio. En el iPhone no aparece.
+
 ## Escritura en Radicale
 
 `POST /api/<método>` solo acepta los métodos de la lista blanca de `src/server/calendarApi.mjs`: las lecturas y `createEvent`, `updateEvent`, `updateEventTime` y `moveEventToCalendar`. Escribe `src/server/radicaleWrite.mjs` con ical.js, como el usuario que ha entrado.
@@ -54,6 +56,7 @@ Radicale se lee con la cuenta de quien ha entrado: `PROPFIND /<usuario>/` descub
 - Series: editar o mover una ocurrencia escribe una excepción RECURRENCE-ID con el TZID del DTSTART original; el resto de la serie no cambia. Desde la web no se crean series y `moveEventToCalendar` rechaza ocurrencias.
 - Se conservan VALARM, X-APPLE-* y VTIMEZONE. MOVE no devuelve etag: se vuelve a leer tras invalidar la caché.
 - Asistentes: una línea `X-FAMILIA-ASISTENTE:<Nombre>` por persona, solo JuanMa y Laura. ATTENDEE no sirve: el iPhone trata el evento como invitación y quita Editar. En la rejilla salen las iniciales en la píldora (ocultas en Mes por debajo de 600 px) y los nombres en el popover.
+- Privado: `X-FAMILIA-PRIVADO:TRUE` en todos los VEVENT del fichero, solo en calendarios personales (en Familia se rechaza, y un evento privado no se mueve a Familia sin quitar la marca). Se marca desde la web; el iPhone no la edita pero la conserva. El otro miembro no lo ve en la web y el MCP de Hermes lo filtra. Marcar una ocurrencia marca la serie, sin crear excepción.
 - En la web se arrastra en Día y Semana; la vista Mes no tiene arrastre.
 - Las pruebas que escriben van en `juanma/personal`, nunca en `familia/casa`: Agatha lee Familia y avisa al grupo.
 

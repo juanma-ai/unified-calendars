@@ -129,3 +129,25 @@ test('a single date is the default; the range is opt-in and only preset for mult
   const multi = { ...timed, allDay: true, start: '2026-10-24', end: '2026-10-27' }
   assert.deepEqual(getEventChanges(multi, eventToForm(multi, tz), tz), {})
 })
+
+test('private only exists in a personal calendar and is dropped before a move to Familia', async () => {
+  const personal = { ...timed, calendarId: 'radicale:juanma:personal', source: 'radicale', providerEventId: '/juanma/personal/a.ics', etag: '"1"', recurrenceId: null }
+  const form = eventToForm(personal, tz)
+  assert.equal(form.private, false)
+  assert.deepEqual(getEventChanges(personal, { ...form, private: true }, tz), { private: true })
+  assert.equal(formToFields({ ...form, private: true, calendarId: 'radicale:familia' }, tz).private, false)
+  // Switching the form to Familia clears the toggle.
+  assert.equal(updateForm({ ...form, private: true }, 'calendarId', 'radicale:familia', tz).private, false)
+
+  const secret = { ...personal, private: true }
+  const calls = []
+  const api = {
+    updateEvent: async input => { calls.push(['update', input]); return { etag: '"2"' } },
+    moveEventToCalendar: async input => { calls.push(['move', input]) }
+  }
+  const calendars = [{ calendarId: 'radicale:familia', providerCalendarId: '/juanma/casa/' }, { calendarId: 'radicale:juanma:personal', providerCalendarId: '/juanma/personal/' }]
+  await saveEventForm({ api, event: secret, form: updateForm(eventToForm(secret, tz), 'calendarId', 'radicale:familia', tz), calendars, timeZone: tz })
+  assert.deepEqual(calls.map(c => c[0]), ['update', 'move'])
+  assert.deepEqual(calls[0][1].changes, { private: false })
+  assert.equal(calls[1][1].event.etag, '"2"')
+})

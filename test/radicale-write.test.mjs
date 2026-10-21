@@ -272,3 +272,26 @@ test('an all-day series gets a date-valued EXDATE', async t => {
   await writer.deleteEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261031' }, scope: 'occurrence' })
   assert.match(store.get(SERIES).ics, /EXDATE;VALUE=DATE:20261031\r\n/)
 })
+
+test('private is written on every VEVENT of a personal file, cleared with false, refused in Familia', async t => {
+  const { writer, store, etagOf } = fakeRadicale(t)
+  // An occurrence of the series marks the whole file, exceptions and alarm kept.
+  await writer.updateEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }, changes: { private: true } })
+  const ics = store.get(SERIES).ics
+  // No RECURRENCE-ID exception just for the flag.
+  assert.equal(vevents(ics).length, vevents(series).length)
+  assert.ok(vevents(ics).every(block => /X-FAMILIA-PRIVADO:TRUE/.test(block)))
+  assert.match(ics, /BEGIN:VALARM/)
+  await writer.updateEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }, changes: { private: false } })
+  assert.doesNotMatch(store.get(SERIES).ics, /X-FAMILIA-PRIVADO/)
+
+  const created = await writer.createEvent({ calendarPath: '/juanma/personal/', title: 'Médico', start: '2026-10-24', end: '2026-10-25', private: true })
+  assert.match(store.get(created.providerEventId).ics, /X-FAMILIA-PRIVADO:TRUE/)
+  await assert.rejects(writer.createEvent({ calendarPath: '/juanma/casa/', title: 'x', start: '2026-10-24', end: '2026-10-25', private: true }), { status: 400 })
+  await assert.rejects(writer.updateEvent({ event: { providerEventId: SINGLE, etag: etagOf(SINGLE) }, changes: { private: true } }), { status: 400 })
+  await assert.rejects(writer.updateEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261029T090000Z' }, changes: { private: 'yes' } }), { status: 400 })
+  await assert.rejects(writer.updateEvent({ event: { providerEventId: SERIES, etag: etagOf(SERIES), recurrenceId: '20261030T090000Z' }, changes: { private: true } }), { status: 404 })
+  // A private event cannot be moved into Familia; it has to be made public first.
+  await assert.rejects(writer.moveEventToCalendar({ event: { providerEventId: created.providerEventId, etag: etagOf(created.providerEventId) }, calendarPath: '/juanma/casa/' }), { status: 400 })
+  assert.ok(store.has(created.providerEventId))
+})
