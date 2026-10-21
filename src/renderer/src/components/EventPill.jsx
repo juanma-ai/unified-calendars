@@ -3,6 +3,7 @@ import { external } from '@wordpress/icons'
 import { format } from 'date-fns'
 import { getEventColor } from '../calendarViewModel.js'
 import { getEventDayRange } from '../calendarViews.js'
+import { getAttendeeInitials, getAttendeeLabel } from '../eventAttendees.js'
 import { getEventPalette } from '../eventColors.js'
 import { TrackedSessionPopover } from './TrackedSessionPopover.jsx'
 import { useEventEditing } from './EventEditor.jsx'
@@ -110,9 +111,12 @@ export function EventPill({
     ? `${trelloAssigneeLabel} - ${showTime ? format(new Date(event.start), 'HH:mm') : trelloDueLabel}`
     : null
   const isTracked = event.source === 'timetracker'
+  const attendeeInitials = getAttendeeInitials(event)
+  const attendeeLabel = getAttendeeLabel(event)
   const actionLabel = [
     event.title,
     dayRangeLabel,
+    attendeeLabel ? `Asistentes: ${attendeeLabel}` : null,
     trelloAssigneeLabel ? `Assigned: ${trelloAssigneeLabel}` : null,
     trelloDueLabel ? `Due: ${trelloDueLabel}` : null,
     isTracked ? 'Open tracked session details' : 'Open event actions'
@@ -126,7 +130,7 @@ export function EventPill({
         <Button
           className={`event-pill${isRow ? ' is-row' : ''}${showTime && !isRow ? ' is-timed' : ''}${
             event.assignedToMe ? ' is-assigned-to-me' : ''
-          }${isTracked && isOpen ? ' is-session-selected' : ''}`}
+          }${isTracked && isOpen ? ' is-session-selected' : ''}${attendeeInitials.length ? ' has-attendees' : ''}`}
           aria-label={actionLabel}
           onClick={onToggle}
           style={isRow ? undefined : { backgroundColor: palette.background, color: palette.text }}
@@ -141,6 +145,11 @@ export function EventPill({
           {continuesBefore && <span className="event-pill__continues" aria-hidden="true">◀</span>}
           {time && !isRow && <span className="event-pill__time">{time}</span>}
           <span className="event-pill__title">{event.title}</span>
+          {attendeeInitials.length > 0 && (
+            <span className="event-pill__attendees" aria-hidden="true">
+              {attendeeInitials.map((initial) => <span key={initial}>{initial}</span>)}
+            </span>
+          )}
           {continuesAfter && <span className="event-pill__continues" aria-hidden="true">▶</span>}
           {trelloMetaLabel && <span className="event-pill__meta">{trelloMetaLabel}</span>}
         </Button>
@@ -164,6 +173,11 @@ export function EventPill({
             >
               Editar
             </MenuItem>
+          )}
+          {attendeeLabel && (
+            <div className="event-actions-popover__meta">
+              <span>Asistentes: {attendeeLabel}</span>
+            </div>
           )}
           {event.source === 'trello' && trelloAssigneeLabel && (
             <div className="event-actions-popover__meta">
