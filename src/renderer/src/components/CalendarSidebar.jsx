@@ -16,14 +16,14 @@ import { formatDuration } from '../trackedTime.js'
 import { buildTrackedSummary, trackedMsByCalendar } from '../trackedSummary.js'
 
 const SOURCE_LABELS = {
-  radicale: 'Radicale',
+  radicale: 'Calendarios (Radicale)',
   google: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
   reminders: 'Reminders',
   timetracker: 'Time Tracker',
   wallos: 'Wallos',
-  vikunja: 'Vikunja'
+  vikunja: 'Tareas (Vikunja)'
 }
 
 function compactAccountLabel(value) {
