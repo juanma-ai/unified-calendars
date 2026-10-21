@@ -2575,6 +2575,12 @@ input {
 
 .event-editor__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Away from Guardar, so a delete is never the button under the thumb by habit. */
+.event-editor__delete {
+  margin-right: auto;
 }

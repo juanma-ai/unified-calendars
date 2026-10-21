@@ -18,10 +18,13 @@ import { EDITOR_ATTENDEES, updateForm, validateForm } from '../eventEditorModel.
 export const EventEditingContext = createContext(null)
 export const useEventEditing = () => useContext(EventEditingContext)
 
-export function EventEditor({ event, initialForm, calendars, timeZone, onSave, onClose }) {
+export function EventEditor({ event, initialForm, calendars, timeZone, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // An occurrence of a series asks which to delete; there is no default.
+  const isSeries = Boolean(event?.recurrenceId)
   const set = (key) => (value) => setForm((current) => updateForm(current, key, value, timeZone))
   // A whole file moves between calendars, so one occurrence cannot.
   const lockedCalendar = Boolean(event?.recurrenceId)
@@ -36,6 +39,18 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
       await onSave(form)
     } catch (saveError) {
       setError(saveError?.message || 'No se pudo guardar el evento.')
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(scope) {
+    setSaving(true)
+    setError(null)
+    try {
+      await onDelete(scope)
+    } catch (deleteError) {
+      setConfirmingDelete(false)
+      setError(deleteError?.message || 'No se pudo eliminar el evento.')
       setSaving(false)
     }
   }
@@ -157,6 +172,18 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
           onChange={set('description')}
         />
         <div className="event-editor__actions">
+          {event && onDelete && (
+            <Button
+              __next40pxDefaultSize
+              className="event-editor__delete"
+              variant="tertiary"
+              isDestructive
+              onClick={() => setConfirmingDelete(true)}
+              disabled={saving}
+            >
+              Eliminar
+            </Button>
+          )}
           <Button __next40pxDefaultSize variant="tertiary" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
@@ -166,6 +193,37 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
           </Button>
         </div>
       </form>
+      {confirmingDelete && (
+        <Modal
+          className="event-editor__confirm"
+          title={`¿Eliminar «${event.title}»?`}
+          onRequestClose={saving ? () => {} : () => setConfirmingDelete(false)}
+          size="small"
+        >
+          <p>{isSeries ? 'Es un evento que se repite. ¿Qué quieres eliminar?' : 'No se puede deshacer.'}</p>
+          <div className="event-editor__actions">
+            <Button __next40pxDefaultSize variant="tertiary" onClick={() => setConfirmingDelete(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            {isSeries ? (
+              <>
+                <Button __next40pxDefaultSize variant="secondary" isDestructive onClick={() => handleDelete('series')} disabled={saving}>
+                  Toda la serie
+                </Button>
+                <Button __next40pxDefaultSize variant="primary" isDestructive onClick={() => handleDelete('occurrence')} disabled={saving} aria-busy={saving}>
+                  {saving && <Spinner />}
+                  Solo este evento
+                </Button>
+              </>
+            ) : (
+              <Button __next40pxDefaultSize variant="primary" isDestructive onClick={() => handleDelete()} disabled={saving} aria-busy={saving}>
+                {saving && <Spinner />}
+                Eliminar
+              </Button>
+            )}
+          </div>
+        </Modal>
+      )}
     </Modal>
   )
 }

@@ -277,6 +277,14 @@ export function App() {
     },
     [editableCalendars, editor, preferences.timeZone, refresh]
   )
+  const handleDeleteEvent = useCallback(
+    async (scope) => {
+      await window.calendarAPI.deleteEvent({ event: editor?.event, scope })
+      setEditor(null)
+      await refresh()
+    },
+    [editor, refresh]
+  )
   const eventEditing = useMemo(
     () => (capabilities?.editableSources ? { canEditEvent, editEvent: openEventEditor } : null),
     [canEditEvent, capabilities, openEventEditor]
@@ -545,6 +553,7 @@ export function App() {
           calendars={editableCalendars}
           timeZone={preferences.timeZone}
           onSave={handleSaveEvent}
+          onDelete={window.calendarAPI.deleteEvent ? handleDeleteEvent : undefined}
           onClose={() => setEditor(null)}
         />
       )}
