@@ -1204,6 +1204,55 @@ input {
   opacity: 0.85;
 }
 
+/* Attendee initials (one X-FAMILIA-ASISTENTE line each, Radicale only). They keep
+   their width while the title ellipsises, like the continuation chevron, and sit on
+   the far end of one-line pills. In the stacked week block they are pinned to the
+   top-right corner so a short event does not clip them below the fold. */
+.event-pill__attendees {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.event-pill__attendees > span {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.calendar-week__timed-event .event-pill__attendees {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+/* Only the short time row shares the top line with the initials, so the pill gets no
+   extra right padding: `Dropdown`'s inline-block wrapper shrink-wraps to min-content,
+   and the padding pushed a phone-width pill past its column, clipping the initials.
+   A block that continues from the day before starts with its title instead. */
+.calendar-week__timed-event .components-button.event-pill.has-attendees {
+  position: relative;
+}
+
+.calendar-week__timed-event.continues-before .has-attendees .event-pill__title {
+  padding-right: 32px;
+}
+
+/* On a phone a month cell is about 50px wide and only the start time fits; the
+   initials would be clipped mid-circle. The names are still in the popover. */
+@media (max-width: 600px) {
+  .calendar-month__segment .event-pill__attendees {
+    display: none;
+  }
+}
+
 .event-pill__title {
   display: -webkit-box;
   overflow: hidden;
