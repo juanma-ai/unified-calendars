@@ -56,7 +56,7 @@ test('writes reject other sources, unknown fields and oversized input before rea
   await assert.rejects(api('updateEventTime', [{ event: { ...event, source: 'vikunja' }, start: '2026-10-29', end: '2026-10-30' }], ctx), { status: 403 })
   for (const args of [
     [], [{ event }, {}], [null], [{ event: { ...event, etag: '' }, changes: {} }], [{ event: { ...event, providerEventId: 3 }, changes: {} }],
-    [{ event, changes: { color: 'red' } }], [{ event, changes: { title: 'x'.repeat(201) } }], [{ event, changes: { attendees: ['a', 'b', 'c'] } }],
+    [{ event, changes: { color: 'red' } }], [{ event, changes: { title: 'x'.repeat(201) } }], [{ event, changes: { attendees: ['a', 'b', 'c'] } }], [{ event, changes: { private: 'true' } }],
     [{ event, changes: { __proto__: { title: 'x' }, sequence: 9 } }], [{ event, changes: [] }]
   ]) await assert.rejects(api('updateEvent', args, ctx), { status: 400 })
   await assert.rejects(api('createEvent', [{ title: 'x', start: '2026-10-24', end: '2026-10-25' }], ctx), { status: 400 })

@@ -19,6 +19,9 @@ function eventFields(fields) {
     if (key === 'attendees') {
       if (!Array.isArray(value) || value.length > 2 || value.some(name => typeof name !== 'string')) throw invalid('Invalid attendees')
       clean.attendees = value
+    } else if (key === 'private') {
+      if (typeof value !== 'boolean') throw invalid('Invalid private')
+      clean.private = value
     } else if (Object.hasOwn(FIELD_LIMITS, key)) {
       if (typeof value !== 'string' || value.length > FIELD_LIMITS[key]) throw invalid(`Invalid ${key}`)
       clean[key] = value

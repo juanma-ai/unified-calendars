@@ -38,6 +38,8 @@ async function reportEvents({ baseUrl, authorization, calendar, calendarPath, ra
       allDay: Boolean(event.allDay), tzUnknown: event.tzUnknown,
       // One X-FAMILIA-ASISTENTE line per person; see src/server/radicaleWrite.mjs.
       attendees: [...String(event.raw ?? '').matchAll(/^X-FAMILIA-ASISTENTE(?:;[^:\r\n]*)?:(.+?)\r?$/gm)].map(m => m[1].trim()),
+      // Marked from the web on a personal calendar: only its owner sees it.
+      private: /^X-FAMILIA-PRIVADO(?:;[^:\r\n]*)?:TRUE\r?$/im.test(String(event.raw ?? '')),
       url: null, status: 'confirmed'
     }))
   )
@@ -87,7 +89,7 @@ export function parseCalendarCollections(xml, user) {
 
 // Web only: reads with the signed-in member's own Radicale account, so the
 // rights file keeps each personal calendar private to its owner.
-export function createUserRadicaleFetcher({ baseUrl, user, password }) {
+export function createUserRadicaleFetcher({ baseUrl, user, password, only = () => true }) {
   const authorization = basicAuth(user, password)
   return async (rangeStart, rangeEnd) => {
     if (!baseUrl || !password) {
@@ -101,7 +103,7 @@ export function createUserRadicaleFetcher({ baseUrl, user, password }) {
         body: DISCOVERY_BODY
       })
       if (response.status !== 207) throw new Error(`Radicale request failed: ${response.status}`)
-      calendars = parseCalendarCollections(await response.text(), user)
+      calendars = parseCalendarCollections(await response.text(), user).filter(only)
     } catch (error) {
       return { events: [], calendars: [], statuses: [{ source: 'radicale', ok: false, lastError: error.message }] }
     }
@@ -114,6 +116,24 @@ export function createUserRadicaleFetcher({ baseUrl, user, password }) {
       statuses: results.map((result, index) => result.status === 'fulfilled'
         ? { source: 'radicale', calendarId: calendars[index].calendarId, ok: true, lastSyncedAt: new Date().toISOString() }
         : { source: 'radicale', calendarId: calendars[index].calendarId, ok: false, lastError: result.reason.message })
+    }
+  }
+}
+
+// Web only: the other member's personal calendar, read with *their* account so
+// the viewer's own Radicale account never gains rights over it. Private events
+// are dropped here, on the server, before they can reach the viewer's cache or
+// browser. Writes stay impossible: the writer only accepts hrefs from the
+// viewer's own PROPFIND, and readOnly just tells the UI not to offer them.
+export function createPeerRadicaleFetcher({ baseUrl, peer, password }) {
+  const calendarId = `radicale:${peer}:personal`
+  const fetchPeer = createUserRadicaleFetcher({ baseUrl, user: peer, password, only: (calendar) => calendar.calendarId === calendarId })
+  return async (rangeStart, rangeEnd) => {
+    const result = await fetchPeer(rangeStart, rangeEnd)
+    return {
+      events: result.events.filter((event) => !event.private).map((event) => ({ ...event, readOnly: true })),
+      calendars: result.calendars.map((calendar) => ({ ...calendar, readOnly: true })),
+      statuses: result.statuses.map((status) => ({ calendarId, ...status }))
     }
   }
 }

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { config } from '../src/main/config.js'
-import { createUserRadicaleFetcher, fetchRadicaleEvents } from '../src/main/sources/radicale.js'
+import { createPeerRadicaleFetcher, createUserRadicaleFetcher, fetchRadicaleEvents } from '../src/main/sources/radicale.js'
 const range = ['2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z']
 const wrap = ics => `<D:multistatus xmlns:D="DAV:"><D:response><D:href>/familia/casa/a.ics</D:href><D:propstat><D:prop><C:calendar-data xmlns:C="urn:ietf:params:xml:ns:caldav"><![CDATA[${ics}]]></C:calendar-data></D:prop></D:propstat></D:response></D:multistatus>`
 function setup(t, body, status = 207) {
@@ -101,4 +101,35 @@ test('attendees come from one X-FAMILIA-ASISTENTE line per person', async t => {
   setup(t, wrap('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nX-FAMILIA-ASISTENTE:JuanMa\r\nX-FAMILIA-ASISTENTE;X-ANY=1:Laura\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:b\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nEND:VEVENT\r\nEND:VCALENDAR'))
   const { events } = await fetchRadicaleEvents(...range)
   assert.deepEqual(events.map(e => e.attendees), [['JuanMa', 'Laura'], []])
+})
+
+test('private comes from X-FAMILIA-PRIVADO:TRUE and nothing else', async t => {
+  const ev = (uid, extra = '') => `BEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\n${extra}END:VEVENT\r\n`
+  setup(t, wrap('BEGIN:VCALENDAR\r\n' + ev('a', 'X-FAMILIA-PRIVADO:TRUE\r\n') + ev('b', 'X-FAMILIA-PRIVADO:FALSE\r\n') + ev('c') + 'END:VCALENDAR'))
+  const { events } = await fetchRadicaleEvents(...range)
+  assert.deepEqual(events.map(e => [e.title, e.private]), [['(Sin título)', true], ['(Sin título)', false], ['(Sin título)', false]])
+})
+
+test('the other member\'s personal calendar is read with their account, read-only and without private events', async t => {
+  const requests = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname
+    requests.push({ path, options })
+    if (options.method === 'PROPFIND') return new Response(discovery('juanma'), { status: 207 })
+    const body = (uid, extra = '') => `<response><href>${path}${uid}.ics</href><propstat><prop><getetag>"e"</getetag><C:calendar-data xmlns:C="urn:ietf:params:xml:ns:caldav">BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:20260907T060000Z\r\nDTEND:20260907T070000Z\r\nSUMMARY:${uid}\r\n${extra}END:VEVENT\r\nEND:VCALENDAR</C:calendar-data></prop></propstat></response>`
+    return new Response(`<multistatus xmlns="DAV:">${body('visible')}${body('secreto', 'X-FAMILIA-PRIVADO:TRUE\r\n')}</multistatus>`, { status: 207 })
+  })
+  const result = await createPeerRadicaleFetcher({ baseUrl: 'https://calendar.test', peer: 'juanma', password: 'j' })(...range)
+  assert.ok(requests.every(r => r.options.headers.Authorization === `Basic ${Buffer.from('juanma:j').toString('base64')}`))
+  assert.deepEqual(requests.map(r => [r.options.method, r.path]), [['PROPFIND', '/juanma/'], ['REPORT', '/juanma/personal/']])
+  assert.deepEqual(result.calendars.map(c => [c.calendarId, c.readOnly]), [['radicale:juanma:personal', true]])
+  assert.deepEqual(result.events.map(e => [e.title, e.readOnly]), [['visible', true]])
+  assert.ok(result.statuses.every(s => s.ok && s.calendarId === 'radicale:juanma:personal'))
+})
+
+test('the other member\'s calendar without a password is not-connected and makes no request', async t => {
+  const requests = davServer(t, 'juanma')
+  const result = await createPeerRadicaleFetcher({ baseUrl: 'https://calendar.test', peer: 'juanma' })(...range)
+  assert.equal(requests.length, 0)
+  assert.deepEqual(result.statuses, [{ calendarId: 'radicale:juanma:personal', source: 'radicale', ok: false, lastError: 'not-connected' }])
 })

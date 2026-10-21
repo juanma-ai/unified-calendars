@@ -6,6 +6,9 @@ import { resolveTimeZone } from './calendarTimeZones.js'
 // Kept free of React so the date maths can be tested in plain Node.
 
 export const EDITOR_ATTENDEES = ['JuanMa', 'Laura']
+// Familia is on both iPhones, so hiding one of its events would hide nothing;
+// only a personal calendar can hold a private event.
+export const canBePrivate = calendarId => calendarId !== 'radicale:familia'
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
 // A date-only value is a civil date: build it from its digits, never parse it
@@ -30,7 +33,8 @@ function toInstant(date, time, timeZone) {
 export function eventToForm(event, timeZone) {
   const base = {
     title: event.title ?? '', calendarId: event.calendarId, location: event.location ?? '',
-    description: event.description ?? '', attendees: EDITOR_ATTENDEES.filter(name => event.attendees?.includes(name))
+    description: event.description ?? '', attendees: EDITOR_ATTENDEES.filter(name => event.attendees?.includes(name)),
+    private: Boolean(event.private)
   }
   if (event.allDay && DATE_ONLY.test(event.start)) {
     // The form shows the last day the event covers; the stored end is exclusive.
@@ -55,7 +59,7 @@ export function newEventForm({ anchorDate, now = new Date(), timeZone, calendarI
     : new TZDate(year, month - 1, date, 9, 0, zone)
   const end = addHours(start, 1)
   return {
-    title: '', calendarId, location: '', description: '', attendees: [], allDay: false, multiDay: false,
+    title: '', calendarId, location: '', description: '', attendees: [], private: false, allDay: false, multiDay: false,
     startDate: format(start, 'yyyy-MM-dd'), startTime: format(start, 'HH:mm'),
     endDate: format(end, 'yyyy-MM-dd'), endTime: format(end, 'HH:mm')
   }
@@ -87,7 +91,8 @@ export function formToFields(form, timeZone) {
   return {
     title: form.title.trim(), ...formTimes(form, timeZone),
     location: form.location.trim(), description: form.description.trim(),
-    attendees: EDITOR_ATTENDEES.filter(name => form.attendees.includes(name))
+    attendees: EDITOR_ATTENDEES.filter(name => form.attendees.includes(name)),
+    private: Boolean(form.private) && canBePrivate(form.calendarId)
   }
 }
 
@@ -100,6 +105,9 @@ export function getEventChanges(event, form, timeZone) {
   for (const key of ['title', 'location', 'description']) if (after[key] !== before[key]) changes[key] = after[key]
   if (after.start !== before.start || after.end !== before.end) Object.assign(changes, { start: after.start, end: after.end })
   if (after.attendees.join() !== before.attendees.join()) changes.attendees = after.attendees
+  // Compared with what the event holds, not with the form it opened with: a
+  // private event moving to Familia has to drop the mark before the MOVE.
+  if (after.private !== Boolean(event.private)) changes.private = after.private
   return changes
 }
 
@@ -127,6 +135,7 @@ export async function saveEventForm({ api, event, form, calendars, timeZone }) {
 // with the new start instead of blocking the save.
 export function updateForm(form, key, value, timeZone) {
   const next = { ...form, [key]: value }
+  if (key === 'calendarId' && !canBePrivate(value)) return { ...next, private: false }
   if (key === 'multiDay' && !value) return { ...next, endDate: form.startDate }
   if ((key !== 'startDate' && key !== 'startTime') || !value || !DATE_ONLY.test(next.startDate)) return next
   if (form.allDay) {
