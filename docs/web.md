@@ -1,6 +1,6 @@
 # Calendario familiar web (bloque E)
 
-Web de solo lectura de Radicale y Vikunja, reutilizando el calendario de Electron.
+Web de Radicale y Vikunja, reutilizando el calendario de Electron. Los eventos de Radicale se crean, editan y mueven desde la web; las tareas de Vikunja son de solo lectura.
 
 - URL: https://coolify-vps.tail96bc47.ts.net:8450
 - Enlace de día: `/?view=day&date=2026-09-07`. La fecha es civil en la zona del calendario.
@@ -8,7 +8,7 @@ Web de solo lectura de Radicale y Vikunja, reutilizando el calendario de Electro
 - Rama de despliegue: `feature/family-web`. La rama principal de Electron no se ha cambiado.
 - Contenedor: puerto 3000; host: `127.0.0.1:8290`; Tailscale Serve: 8450.
 - Login: Pocket ID en 8448, callback `/auth/callback`; identidades de JuanMa y Laura por `sub`; `WEB_USER_MAP` (`sub=juanma,sub=laura`) dice quién entra y con qué usuario de Radicale actúa.
-- Preferencias (colores, filtros y zonas): locales a cada navegador. Eventos y tareas no se modifican.
+- Preferencias (colores, filtros y zonas): locales a cada navegador.
 - Las sesiones caducan a las 12 horas; un reinicio requiere volver a iniciar sesión.
 
 ## Código compartido y entradas separadas
@@ -40,10 +40,22 @@ Variables de runtime en Coolify (ninguna se inyecta al build). La API bulk no ad
 
 - `WEB_PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_INTERNAL_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `WEB_USER_MAP`.
 - `RADICALE_URL`, y una `RADICALE_PASSWORD_<USUARIO>` por cada usuario de `WEB_USER_MAP` (`RADICALE_PASSWORD_JUANMA`, `RADICALE_PASSWORD_LAURA`).
-- `VIKUNJA_BASE_URL`, `VIKUNJA_TOKEN`, `VIKUNJA_PROJECT_IDS=20`.
+- `VIKUNJA_BASE_URL`, `VIKUNJA_TOKEN`, `VIKUNJA_PROJECT_IDS=20,27` (Family y el de Laura; compartir antes con `calendar-web`).
 
 Cuenta de Vikunja: `calendar-web`, permiso de lectura sobre Family. Token restringido a lectura de proyectos y tareas; caduca el 1 de enero de 2036. El filtro por proyecto no reemplaza los permisos del usuario.
-Radicale se lee con la cuenta de quien ha entrado: `PROPFIND /<usuario>/` descubre sus calendarios de eventos (Familia por el enlace `casa` y el personal; el de tareas VTODO del iPhone se ignora). Así el fichero de derechos de Radicale impide que uno vea el personal del otro. Cada usuario tiene su propio agregador y su propia caché. El servidor HTTP solo expone consultas; no existe ruta de escritura DAV.
+Radicale se lee con la cuenta de quien ha entrado: `PROPFIND /<usuario>/` descubre sus calendarios de eventos (Familia por el enlace `casa` y el personal; el de tareas VTODO del iPhone se ignora). Así el fichero de derechos de Radicale impide que uno vea el personal del otro. Cada usuario tiene su propio agregador y su propia caché.
+
+## Escritura en Radicale
+
+`POST /api/<método>` solo acepta los métodos de la lista blanca de `src/server/calendarApi.mjs`: las lecturas y `createEvent`, `updateEvent`, `updateEventTime` y `moveEventToCalendar`. Escribe `src/server/radicaleWrite.mjs` con ical.js, como el usuario que ha entrado.
+
+- Rutas: en cada escritura un PROPFIND nuevo da los calendarios del usuario; el `href` del evento y el calendario de destino tienen que estar entre ellos. Nunca se fía del cliente. La frontera final sigue siendo el fichero de derechos de Radicale.
+- Conflictos: GET del recurso, comparación con el etag del cliente y PUT con `If-Match`. Un 412 llega al navegador como 409 "Alguien ha cambiado este evento. Recarga y vuelve a intentarlo."
+- Series: editar o mover una ocurrencia escribe una excepción RECURRENCE-ID con el TZID del DTSTART original; el resto de la serie no cambia. Desde la web no se crean series y `moveEventToCalendar` rechaza ocurrencias.
+- Se conservan VALARM, X-APPLE-* y VTIMEZONE. MOVE no devuelve etag: se vuelve a leer tras invalidar la caché.
+- Asistentes: una línea `X-FAMILIA-ASISTENTE:<Nombre>` por persona, solo JuanMa y Laura. ATTENDEE no sirve: el iPhone trata el evento como invitación y quita Editar. En la rejilla salen las iniciales en la píldora (ocultas en Mes por debajo de 600 px) y los nombres en el popover.
+- En la web se arrastra en Día y Semana; la vista Mes no tiene arrastre.
+- Las pruebas que escriben van en `juanma/personal`, nunca en `familia/casa`: Agatha lee Familia y avisa al grupo.
 
 Se han configurado los submódulos y el webhook de GitHub en Coolify.
 **Cada push despliega por webhook. No lanzar además un despliegue por API.**
@@ -62,7 +74,7 @@ Tras aplicar la política, comprobar el filtro real con `tailscale debug netmap`
 
 ## Validación
 
-Pruebas: adaptador contra fixture real del iPhone; ocurrencias expandidas y límites DST en casa-agent; caché, puente, rangos, rechazo de mutaciones, sesión, PKCE/state/nonce y restricción de identidad; deep links en zonas distintas; orden de fuentes.
+Pruebas: adaptador contra fixture real del iPhone; escritura con fixtures del iPhone (alarmas, X-APPLE, excepción con TZID, rutas de fuera, 412); ocurrencias expandidas y límites DST en casa-agent; caché, puente, rangos, rechazo de mutaciones, sesión, PKCE/state/nonce y restricción de identidad; deep links en zonas distintas; orden de fuentes.
 
 `npm test` ejecuta la suite unitaria portable. `npm run test:integration` ejecuta las pruebas de Recordatorios que necesitan el helper nativo construido y autorizado en macOS; no confundir ese requisito con un fallo web.
 
