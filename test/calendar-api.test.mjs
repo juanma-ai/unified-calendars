@@ -10,7 +10,7 @@ test('API allows reads and rejects mutations, prototype methods and unbounded ra
   await api('getUnifiedEvents', ['2026-09-07', '2026-09-08'], ctx)
   assert.equal(calls.length, 1)
   assert.deepEqual(users, ['juanma'])
-  for (const method of ['setReminderCompleted', 'deleteEvent', 'constructor', '__proto__']) {
+  for (const method of ['setReminderCompleted', 'deleteCalendar', 'constructor', '__proto__']) {
     await assert.rejects(api(method, [], ctx), { status: 403 })
   }
   for (const args of [[], ['bad', 'date'], ['2026-09-08', '2026-09-07'], ['2026-01-01', '2028-01-01']]) {
@@ -26,7 +26,8 @@ test('writes reach the member’s own writer with only whitelisted fields, then 
     createEvent: input => { written.push(['createEvent', input]); return { providerEventId: '/juanma/casa/N.ics', etag: '"1"' } },
     updateEvent: input => { written.push(['updateEvent', input]); return { etag: '"2"' } },
     updateEventTime: input => { written.push(['updateEventTime', input]); return { etag: '"3"' } },
-    moveEventToCalendar: input => { written.push(['moveEventToCalendar', input]); return { etag: '"4"' } }
+    moveEventToCalendar: input => { written.push(['moveEventToCalendar', input]); return { etag: '"4"' } },
+    deleteEvent: input => { written.push(['deleteEvent', input]); return { providerEventId: null, etag: null } }
   }
   const api = createCalendarApi(user => ({ invalidateSourceCache: source => invalidated.push([user, source]) }), user => { writersFor.push(user); return writer })
   const ctx = { user: 'laura' }
@@ -36,14 +37,16 @@ test('writes reach the member’s own writer with only whitelisted fields, then 
   await api('updateEvent', [{ event, changes: { title: 'Nuevo', location: '' } }], ctx)
   await api('updateEventTime', [{ event, start: '2026-10-29T15:00:00Z', end: '2026-10-29T16:00:00Z' }], ctx)
   await api('moveEventToCalendar', [{ event: { ...event, recurrenceId: undefined }, calendarPath: '/laura/personal/' }], ctx)
+  await api('deleteEvent', [{ event, scope: 'occurrence' }], ctx)
   assert.deepEqual(written, [
     ['createEvent', { calendarPath: '/laura/casa/', title: 'Cena', start: '2026-10-24', end: '2026-10-25', attendees: ['JuanMa'] }],
     ['updateEvent', { event: ref, changes: { title: 'Nuevo', location: '' } }],
     ['updateEventTime', { event: ref, start: '2026-10-29T15:00:00Z', end: '2026-10-29T16:00:00Z' }],
-    ['moveEventToCalendar', { event: { ...ref, recurrenceId: null }, calendarPath: '/laura/personal/' }]
+    ['moveEventToCalendar', { event: { ...ref, recurrenceId: null }, calendarPath: '/laura/personal/' }],
+    ['deleteEvent', { event: ref, scope: 'occurrence' }]
   ])
   assert.deepEqual(new Set(writersFor), new Set(['laura']))
-  assert.deepEqual(invalidated, Array(4).fill(['laura', 'radicale']))
+  assert.deepEqual(invalidated, Array(5).fill(['laura', 'radicale']))
 })
 test('writes reject other sources, unknown fields and oversized input before reaching Radicale', async () => {
   let reached = false
@@ -58,6 +61,8 @@ test('writes reject other sources, unknown fields and oversized input before rea
   ]) await assert.rejects(api('updateEvent', args, ctx), { status: 400 })
   await assert.rejects(api('createEvent', [{ title: 'x', start: '2026-10-24', end: '2026-10-25' }], ctx), { status: 400 })
   await assert.rejects(api('moveEventToCalendar', [{ event, calendarPath: 7 }], ctx), { status: 400 })
+  for (const scope of ['all', 7, null]) await assert.rejects(api('deleteEvent', [{ event, scope }], ctx), { status: 400 })
+  await assert.rejects(api('deleteEvent', [{ event: { ...event, source: 'google' } }], ctx), { status: 403 })
   assert.equal(reached, false)
   // Without a writer the API stays read-only.
   await assert.rejects(createCalendarApi(() => ({}))('updateEvent', [{ event, changes: {} }], ctx), { status: 403 })

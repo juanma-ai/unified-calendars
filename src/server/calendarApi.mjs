@@ -79,6 +79,13 @@ export function createCalendarApi(aggregatorFor, writerFor = () => { throw Objec
     moveEventToCalendar: write(({ event, calendarPath: path }) => {
       const input = { event: eventRef(event), calendarPath: calendarPath(path) }
       return writer => writer.moveEventToCalendar(input)
+    }),
+    // The writer decides whether a scope is needed (a series needs one); here
+    // it only has to be one of the two the web offers.
+    deleteEvent: write(({ event, scope }) => {
+      if (scope !== undefined && scope !== 'occurrence' && scope !== 'series') throw invalid('Invalid scope')
+      const input = { event: eventRef(event), scope }
+      return writer => writer.deleteEvent(input)
     })
   }
   const methods = { ...reads, ...writes }
