@@ -10,7 +10,7 @@ import {
   ToggleControl
 } from '@wordpress/components'
 import { createContext, useContext, useState } from 'react'
-import { EDITOR_ATTENDEES, updateForm, validateForm } from '../eventEditorModel.js'
+import { canBePrivate, EDITOR_ATTENDEES, updateForm, validateForm } from '../eventEditorModel.js'
 
 // Provided only by the family web, which is the one surface that writes
 // events through a form. EventPill reads it to offer "Editar"; without a
@@ -143,6 +143,15 @@ export function EventEditor({ event, initialForm, calendars, timeZone, onSave, o
           help={lockedCalendar ? 'Es una ocurrencia de una serie: solo se puede cambiar de calendario la serie entera, desde el iPhone.' : undefined}
           options={calendars.map((calendar) => ({ label: calendar.calendarName, value: calendar.calendarId }))}
         />
+        {canBePrivate(form.calendarId) && (
+          <ToggleControl
+            __nextHasNoMarginBottom
+            label="Privado"
+            help="Solo lo ves tú: no sale en el calendario de nadie más ni lo ve Agatha."
+            checked={Boolean(form.private)}
+            onChange={set('private')}
+          />
+        )}
         <fieldset className="event-editor__attendees">
           <legend>Asistentes</legend>
           {EDITOR_ATTENDEES.map((name) => (

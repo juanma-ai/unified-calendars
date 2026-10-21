@@ -1208,6 +1208,14 @@ input {
    their width while the title ellipsises, like the continuation chevron, and sit on
    the far end of one-line pills. In the stacked week block they are pinned to the
    top-right corner so a short event does not clip them below the fold. */
+/* Private events (family web): a small lock before the title, in the pill's text colour. */
+.event-pill__private {
+  flex: 0 0 auto;
+  margin-right: 2px;
+  vertical-align: -2px;
+  fill: currentColor;
+}
+
 .event-pill__attendees {
   display: inline-flex;
   flex: 0 0 auto;

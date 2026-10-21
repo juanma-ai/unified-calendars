@@ -1,5 +1,5 @@
-import { Button, Dropdown, MenuGroup, MenuItem } from '@wordpress/components'
-import { external } from '@wordpress/icons'
+import { Button, Dropdown, Icon, MenuGroup, MenuItem } from '@wordpress/components'
+import { external, lock } from '@wordpress/icons'
 import { format } from 'date-fns'
 import { getEventColor } from '../calendarViewModel.js'
 import { getEventDayRange } from '../calendarViews.js'
@@ -115,6 +115,7 @@ export function EventPill({
   const attendeeLabel = getAttendeeLabel(event)
   const actionLabel = [
     event.title,
+    event.private ? 'Privado' : null,
     dayRangeLabel,
     attendeeLabel ? `Asistentes: ${attendeeLabel}` : null,
     trelloAssigneeLabel ? `Assigned: ${trelloAssigneeLabel}` : null,
@@ -144,6 +145,7 @@ export function EventPill({
           )}
           {continuesBefore && <span className="event-pill__continues" aria-hidden="true">◀</span>}
           {time && !isRow && <span className="event-pill__time">{time}</span>}
+          {event.private && <Icon className="event-pill__private" icon={lock} size={12} aria-hidden="true" />}
           <span className="event-pill__title">{event.title}</span>
           {attendeeInitials.length > 0 && (
             <span className="event-pill__attendees" aria-hidden="true">
@@ -173,6 +175,11 @@ export function EventPill({
             >
               Editar
             </MenuItem>
+          )}
+          {event.private && (
+            <div className="event-actions-popover__meta">
+              <span>Privado: solo lo ves tú</span>
+            </div>
           )}
           {attendeeLabel && (
             <div className="event-actions-popover__meta">
