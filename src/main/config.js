@@ -44,6 +44,9 @@ export const config = {
   },
   vikunja: {
     baseUrl: process.env.VIKUNJA_BASE_URL,
+    // Where people open tasks. Differs from baseUrl when the server reaches
+    // Vikunja over an internal network the browser cannot resolve.
+    publicUrl: process.env.VIKUNJA_PUBLIC_URL,
     token: process.env.VIKUNJA_TOKEN,
     projectIds: (process.env.VIKUNJA_PROJECT_IDS ?? '')
       .split(',')

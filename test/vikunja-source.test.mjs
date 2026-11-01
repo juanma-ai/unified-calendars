@@ -187,3 +187,47 @@ test('a failing request surfaces as a status, never a throw', async (t) => {
   assert.equal(result.statuses[0].ok, false)
   assert.match(result.statuses[0].lastError, /401/)
 })
+
+test('links use VIKUNJA_PUBLIC_URL while requests keep using the internal base URL', async (t) => {
+  useConfig(t, {
+    baseUrl: 'http://vikunja-app:3456',
+    publicUrl: 'https://tareas.example.test/',
+    token: 'tk_test',
+    projectIds: []
+  })
+  const requested = []
+
+  globalThis.fetch = async (url) => {
+    requested.push(url)
+    return {
+      ok: true,
+      json: async () =>
+        url.includes('/projects')
+          ? PROJECTS
+          : { items: [task(1)], total: 1, page: 1, per_page: 1000, total_pages: 1 }
+    }
+  }
+
+  const result = await fetchVikunjaEvents(...RANGE)
+
+  assert.ok(requested.every((url) => url.startsWith('http://vikunja-app:3456/api/v2/')))
+  assert.equal(result.events[0].url, 'https://tareas.example.test/tasks/1')
+  assert.equal(result.calendars[0].url, 'https://tareas.example.test/projects/20')
+})
+
+test('links fall back to the base URL when VIKUNJA_PUBLIC_URL is not set', async (t) => {
+  useConfig(t, { baseUrl: 'https://tareas.example.test', publicUrl: undefined, token: 'tk_test', projectIds: [] })
+
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.includes('/projects')
+        ? PROJECTS
+        : { items: [task(1)], total: 1, page: 1, per_page: 1000, total_pages: 1 }
+  })
+
+  const result = await fetchVikunjaEvents(...RANGE)
+
+  assert.equal(result.events[0].url, 'https://tareas.example.test/tasks/1')
+  assert.equal(result.calendars[0].url, 'https://tareas.example.test/projects/20')
+})

@@ -82,7 +82,7 @@ export async function fetchVikunjaEvents(rangeStart, rangeEnd) {
   }
 
   try {
-    const baseUrl = config.vikunja.baseUrl.replace(/\/+$/, '')
+    const linkBase = (config.vikunja.publicUrl || config.vikunja.baseUrl).replace(/\/+$/, '')
     const from = new Date(rangeStart).toISOString()
     const to = new Date(rangeEnd).toISOString()
 
@@ -115,7 +115,7 @@ export async function fetchVikunjaEvents(rangeStart, rangeEnd) {
       if (allowed.length > 0 && !allowed.includes(String(projectId))) continue
 
       usedProjectIds.add(projectId)
-      events.push(mapVikunjaTask(task, project, baseUrl))
+      events.push(mapVikunjaTask(task, project, linkBase))
     }
 
     const calendars = [...usedProjectIds].map((projectId) => {
@@ -125,7 +125,7 @@ export async function fetchVikunjaEvents(rangeStart, rangeEnd) {
         calendarId: `vikunja:${project.id}`,
         providerCalendarId: String(project.id),
         calendarName: project.name,
-        url: `${baseUrl}/projects/${project.id}`,
+        url: `${linkBase}/projects/${project.id}`,
         calendarDefaultColor: project.color,
         calendarDefaultVisible: false
       }
